@@ -38,6 +38,23 @@ smoke:
 dump name='dump':
     uv run python moon_device.py dump "{{ name }}"
 
+# Run any driver command (JSON result; see README "Commands"), e.g. `just device run open 'TEST - Pride  Prejudice.epub'`.
+[positional-arguments]
+run command *args:
+    uv run python moon_device.py "$@"
+
+# Read a test book's .po / .an from Moon+'s Drive sync folder (read-only), e.g. `just device fetch 'TEST - Pride  Prejudice.epub'`.
+fetch book:
+    uv run python moon_device.py fetch "{{ book }}"
+
+# Run a multi-step phone scenario checked against Drive, e.g. `just device scenario deletes` (operates the phone for ~5 minutes).
+scenario name:
+    uv run python scenarios.py "{{ name }}"
+
+# Offline checks of the test-book guard (no phone needed).
+test:
+    uv run python -m unittest -v test_safety
+
 # Copy the allowlisted test books from a local folder to the phone's test folder, e.g. `just device push-test-books 'C:/Users/Eddy/Downloads/moon-an-samples'`.
 push-test-books source:
     MSYS_NO_PATHCONV=1 "{{ adb }}" shell mkdir -p "/storage/emulated/0/Books/MoonReader/TEST"
