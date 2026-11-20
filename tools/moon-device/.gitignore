@@ -1,0 +1,9 @@
+# Android platform-tools (adb) downloaded by `just device setup-adb`
+.tools/
+.venv/
+__pycache__/
+# Screenshots, UI dumps and pulled files from device runs
+captures/
+
+# Local settings (device serial, Drive key path, folder id)
+.env

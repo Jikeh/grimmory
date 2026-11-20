@@ -1,0 +1,55 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set working-directory := '.'
+
+adb := justfile_directory() + '/.tools/platform-tools/adb' + if os_family() == 'windows' { '.exe' } else { '' }
+platform_tools_url := if os_family() == 'windows' { 'https://dl.google.com/android/repository/platform-tools-latest-windows.zip' } else if os() == 'macos' { 'https://dl.google.com/android/repository/platform-tools-latest-darwin.zip' } else { 'https://dl.google.com/android/repository/platform-tools-latest-linux.zip' }
+
+# Download Android platform-tools (adb) into this folder's ignored .tools/ directory.
+setup-adb:
+    mkdir -p .tools
+    curl -fsSL -o .tools/platform-tools.zip "{{ platform_tools_url }}"
+    rm -rf .tools/platform-tools
+    unzip -q -o .tools/platform-tools.zip -d .tools
+    rm .tools/platform-tools.zip
+    "{{ adb }}" version
+
+# Install the Python dependencies (uiautomator2) with uv.
+setup: setup-adb
+    uv sync
+
+# Pair with the phone once (Developer options → Wireless debugging → Pair device with pairing code), e.g. `just device pair 192.168.1.50:41234 123456`.
+pair address code:
+    "{{ adb }}" pair "{{ address }}" "{{ code }}"
+
+# Connect to the phone's wireless-debugging address (shown on the Wireless debugging screen; a different port than pairing), e.g. `just device connect 192.168.1.50:37891`.
+connect address:
+    "{{ adb }}" connect "{{ address }}"
+    "{{ adb }}" devices -l
+
+# List connected devices.
+devices:
+    "{{ adb }}" devices -l
+
+# Connect, report the device and Moon+ version, open Moon+, and save a screenshot + UI dump to captures/.
+smoke:
+    uv run python moon_device.py smoke
+
+# Save a screenshot + UI dump of whatever is on screen right now, e.g. `just device dump reader-open`.
+dump name='dump':
+    uv run python moon_device.py dump "{{ name }}"
+
+# Copy the allowlisted test books from a local folder to the phone's test folder, e.g. `just device push-test-books 'C:/Users/Eddy/Downloads/moon-an-samples'`.
+push-test-books source:
+    MSYS_NO_PATHCONV=1 "{{ adb }}" shell mkdir -p "/storage/emulated/0/Books/MoonReader/TEST"
+    grep -v '^#' test_books.txt | grep -v '^[[:space:]]*$' | while IFS= read -r f; do MSYS_NO_PATHCONV=1 "{{ adb }}" push "{{ source }}/$f" "/storage/emulated/0/Books/MoonReader/TEST/"; done
+
+# Remove the test books from the phone: the TEST folder and Moon+'s cached covers for those books. Their Drive .po/.an files and Moon+ library/history entries are listed in the README as manual steps.
+remove-test-books:
+    MSYS_NO_PATHCONV=1 "{{ adb }}" shell rm -rf "/storage/emulated/0/Books/MoonReader/TEST"
+    grep -v '^#' test_books.txt | grep -v '^[[:space:]]*$' | while IFS= read -r f; do MSYS_NO_PATHCONV=1 "{{ adb }}" shell "rm -f \"/storage/emulated/0/Books/.MoonReader/$f\"*.png"; done
+    MSYS_NO_PATHCONV=1 "{{ adb }}" shell ls "/storage/emulated/0/Books/MoonReader/" | grep -c 'TEST' || echo "test books removed"
+
+# Remove the uiautomator2 helper apps from the phone.
+uninstall-helper:
+    "{{ adb }}" uninstall com.github.uiautomator || true
+    "{{ adb }}" uninstall com.github.uiautomator.test || true

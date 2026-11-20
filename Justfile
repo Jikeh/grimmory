@@ -2,6 +2,7 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 mod api 'backend/Justfile'
 mod ui 'frontend/Justfile'
+mod device 'tools/moon-device/Justfile'
 
 compose_file := env_var_or_default('GRIMMORY_COMPOSE_FILE', 'dev.docker-compose.yml')
 compose_cmd := 'docker compose -f ' + compose_file
