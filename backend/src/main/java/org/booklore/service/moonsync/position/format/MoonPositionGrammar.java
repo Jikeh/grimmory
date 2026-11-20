@@ -29,8 +29,21 @@ final class MoonPositionGrammar {
         if (!DECIMAL.matcher(percentText).matches()) {
             throw new IllegalArgumentException("Moon+ percent must be a plain decimal: " + percentText);
         }
-        if (webViewScrollOffset != null && !SIGNED_DIGITS.matcher(webViewScrollOffset).matches()) {
-            throw new IllegalArgumentException("Moon+ WebView scroll offset must be an integer: " + webViewScrollOffset);
+        if (webViewScrollOffset != null && !isInt(webViewScrollOffset)) {
+            // Sync.notifyNewCloudPosition reads it with Integer.valueOf.
+            throw new IllegalArgumentException("Moon+ WebView scroll offset must be an int: " + webViewScrollOffset);
+        }
+    }
+
+    private static boolean isInt(String value) {
+        if (!SIGNED_DIGITS.matcher(value).matches()) {
+            return false;
+        }
+        try {
+            Integer.parseInt(value);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 

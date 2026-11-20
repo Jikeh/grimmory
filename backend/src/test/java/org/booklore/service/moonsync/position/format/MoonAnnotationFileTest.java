@@ -418,6 +418,29 @@ class MoonAnnotationFileTest {
                     .hasMessageContaining("note");
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"", "false", "1.0"})
+        void refusesNonIntUnderlineOrStrikethrough(String value) {
+            MoonAnnotationRecord base = highlight("1", 0, 0, 0, "text");
+            MoonAnnotationRecord badUnderline = new MoonAnnotationRecord(base.id(), base.filename(), base.path(), base.lowerPath(),
+                    0, 0, 0, 4, 1, 1L, "", "", "text", value, "0", "0");
+            MoonAnnotationRecord badStrikethrough = new MoonAnnotationRecord(base.id(), base.filename(), base.path(), base.lowerPath(),
+                    0, 0, 0, 4, 1, 1L, "", "", "text", "0", value, "0");
+            MoonAnnotationHeader header = new MoonAnnotationHeader("1", true, true);
+
+            assertThatThrownBy(() -> MoonAnnotationFile.of(header, List.of(badUnderline)).toText())
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("underline");
+            assertThatThrownBy(() -> MoonAnnotationFile.of(header, List.of(badStrikethrough)).toText())
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("strikethrough");
+        }
+
+        @Test
+        void readsAnEpubHighlightThatQuotesThePdfTag() {
+            String record = "#\n1\nbook.epub\n/p\n/p\n0\n0\n100\n4\n123\n1000\n\n\nsee #A*# here\n0\n0\n0\n";
+
+            assertThat(MoonAnnotationFile.parse(zlib(HEADER + record)).records().getFirst().text()).isEqualTo("see #A*# here");
+        }
+
         @Test
         void refusesACarriageReturnBecauseMoonSplitsLinesOnIt() {
             MoonAnnotationRecord broken = highlight("1", 0, 0, 0, "one\rtwo");

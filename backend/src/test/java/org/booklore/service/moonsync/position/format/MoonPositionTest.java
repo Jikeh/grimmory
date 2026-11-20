@@ -192,6 +192,7 @@ class MoonPositionTest {
                 "1738611943423*3@0#-4281:1.5%",
                 "1738611943423*3@0:1.5%",
                 "1738611943423*99999999999@0#1:1.5%",
+                "1738611943423*3@0#4281:1.5%|99999999999",
         })
         void rejectsWithAClearMessage(String text) {
             assertThatThrownBy(() -> MoonPosition.parse(text))

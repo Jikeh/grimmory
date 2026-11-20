@@ -70,7 +70,7 @@ public sealed interface MoonPosition permits MoonPosition.Epub, MoonPosition.Pdf
             if (pdf.matches()) {
                 return new Pdf(pdf.group("device"), Integer.parseInt(pdf.group("page")), pdf.group("percent"), pdf.group("scroll"));
             }
-        } catch (NumberFormatException e) {
+        } catch (IllegalArgumentException e) {
             throw new MoonFormatException("Unrecognized .po content (number out of range): " + quote(text), e);
         }
         throw new MoonFormatException("Unrecognized .po content: " + quote(text));

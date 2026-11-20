@@ -84,10 +84,11 @@ public final class MoonAnnotationFile {
     /** Parses the decompressed text of an {@code .an} file. */
     public static MoonAnnotationFile parseText(String text) {
         Objects.requireNonNull(text, "text");
-        if (text.contains(PDF_TAG)) {
+        List<String> lines = new ArrayList<>(Arrays.asList(text.split("\n", -1)));
+        // A PDF file starts "{size}#A*#..."; checking only line 0 keeps an EPUB highlight quoting "#A*#" readable.
+        if (lines.getFirst().contains(PDF_TAG)) {
             throw new MoonFormatException("PDF .an files are not supported; only EPUB highlights are synced");
         }
-        List<String> lines = new ArrayList<>(Arrays.asList(text.split("\n", -1)));
         boolean trailingNewline = lines.size() > 1 && lines.getLast().isEmpty();
         if (trailingNewline) {
             lines.removeLast();
@@ -295,10 +296,20 @@ public final class MoonAnnotationFile {
         // importNotesFromText reads by fixed index, so an extra line shifts the *DELETED* marker out of slot 16.
         addSingleLine(lines, "note", r.note());
         addSingleLine(lines, "text", r.text());
-        addSingleLine(lines, "underline", r.underline());
-        addSingleLine(lines, "strikethrough", r.strikethrough());
+        addIntLine(lines, "underline", r.underline());
+        addIntLine(lines, "strikethrough", r.strikethrough());
         addSingleLine(lines, "bak", r.bak());
         return lines;
+    }
+
+    /** importNotesFromText reads these columns with {@code Integer.valueOf}; anything else aborts Moon+'s import. */
+    private static void addIntLine(List<String> lines, String field, String value) {
+        try {
+            Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Moon+ .an " + field + " field must be an int, found \"" + value + "\"", e);
+        }
+        lines.add(value);
     }
 
     /** Moon+ splits the file with {@code BufferedReader.readLine}, which breaks on {@code \r} as well as {@code \n}. */
