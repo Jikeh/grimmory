@@ -1,0 +1,471 @@
+{
+  "book": {
+    "moonFileName": "TEST - ULYSSES.epub",
+    "resource": "moonsync/books/ulysses.epub",
+    "format": "EPUB",
+    "edition": "James Joyce, Ulysses — Standard Ebooks edition (released to the public domain, CC0; see uncopyright.xhtml)",
+    "structure": "25 spine items, one per NCX navPoint; NCX nests chapters under Parts I-III. Chapters XII, XIV, XVI, XVII, XVIII split into 2 chunks and XV into 7 (Moon+ 10.8 rule, 100,000-char body).",
+    "sha256": "b4a011489cacc108a08120b04df49cc3478fb89f565dc63ba1d6a91eb6fc7ea0",
+    "size": 1438506
+  },
+  "moonVersion": "10.8",
+  "device": "Samsung Galaxy S25 (SM-S931B), Android 17, 1080x2340; Moon+ Reader Pro 10.8, automatic Drive sync",
+  "display": "The user's Moon+ display settings, unchanged (dark theme, justified text with hyphenation, status line on).",
+  "notes": [
+    "Chapter index = flattened NCX ordinal = spine index for this book (one navPoint per spine file); Parts are their own chapters (index 2, 6, 19).",
+    "Split boundaries match A.createSplitHtmls on the <body> inner HTML: cut at the next '<p' within 20,000 chars of 100,000, else after the next '>'. XV chunk @3 starts mid-paragraph ('He touches the keys again.') because the next '<p' was beyond the 20,000 window: Moon+ cut after the opening <i ...> tag.",
+    "Offsets restart at 0 in every chunk: the .po at a chunk's first page is {chapter}@{split}#0 and a probe on its first character is at position 0.",
+    "Moon+ draws a '[n/N]' marker (blue, after a line break) at the end of every non-final chunk; it is part of the chunk's rendered text after the last character.",
+    "The status line's page numbers are estimates across chunks (the same page showed 1/24, 41/58 and 49/147-style counts); only the .po is reliable.",
+    "A forced 'Sync to cloud' right after a chapter-list jump or a backward page turn uploaded a stale offset (chapter start, offset 0); closing the reader uploaded the real position. Captures here use close.",
+    "Moon+'s word selection treats the curly apostrophe as a word break: long-pressing \"I’m\" selected from 'm'."
+  ],
+  "captures": [
+    {
+      "id": "po-xii-start",
+      "kind": "po",
+      "context": {
+        "how": "XI last page, one page turn forward, close",
+        "page": "XII chunk @0, first page",
+        "statusLine": [
+          "XII (1/58)",
+          "32.6%"
+        ]
+      },
+      "raw": "1738611943423*15@0#0:32.6%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 15,
+        "split": 0,
+        "offset": 0,
+        "percent": "32.6",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-xi-last-page",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → XII, one page turn back, close",
+        "page": "XI last page",
+        "statusLine": [
+          "XI (37/37)",
+          null
+        ]
+      },
+      "raw": "1738611943423*14@0#67924:32.5%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 14,
+        "split": 0,
+        "offset": 67924,
+        "percent": "32.5",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-forced-sync-stale-after-jump",
+      "kind": "po",
+      "context": {
+        "how": "open (book at I start), chapter list → XII, reader bar 'Sync to cloud'",
+        "page": "XII chunk @0 first page on screen; the upload still carried the open-time position",
+        "finding": "stale forced upload",
+        "statusLine": [
+          "XII (1/58)",
+          "32.6%"
+        ]
+      },
+      "raw": "1738611943423*3@0#0:0.1%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 3,
+        "split": 0,
+        "offset": 0,
+        "percent": "0.1",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-forced-sync-stale-after-prev",
+      "kind": "po",
+      "context": {
+        "how": "XII p1, page turn back to XI's last page, reader bar 'Sync to cloud'",
+        "page": "XI last page on screen; the upload carried XI's start (offset 0)",
+        "finding": "stale forced upload",
+        "statusLine": [
+          "XI (37/37)",
+          null
+        ]
+      },
+      "raw": "1738611943423*14@0#0:28.8%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 14,
+        "split": 0,
+        "offset": 0,
+        "percent": "28.8",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-xii-chunk0-last-page",
+      "kind": "po",
+      "context": {
+        "page": "XII chunk @0 last page (ends with the [1/2] marker)",
+        "pageStartsWith": "th a long cane and he draws out and he flogs the bloody backside off"
+      },
+      "raw": "1738611943423*15@0#83184:36.4%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 15,
+        "split": 0,
+        "offset": 83184,
+        "percent": "36.4",
+        "scroll": null
+      }
+    },
+    {
+      "id": "U1",
+      "kind": "probe",
+      "text": "That’s your glorious British navy, says the citizen, that",
+      "screen": {
+        "from": [
+          160,
+          278
+        ],
+        "to": [
+          999,
+          278
+        ],
+        "line": 3
+      },
+      "context": {
+        "page": "po-xii-chunk0-last-page",
+        "note": "long-press on '—That’s' selected from 'That’s' (the dash is not part of the word)"
+      },
+      "raw": "#\n155\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n15\n0\n83298\n57\n1996532479\n1795214458989\n\n\nThat’s your glorious British navy, says the citizen, that\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 15,
+        "split": 0,
+        "position": 83298,
+        "length": 57
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "U2",
+      "kind": "probe",
+      "text": "sons of Granuaile, the champions of Kathleen ni Houlihan",
+      "screen": {
+        "from": [
+          40,
+          2133
+        ],
+        "to": [
+          973,
+          2133
+        ],
+        "line": 38
+      },
+      "context": {
+        "page": "po-xii-chunk0-last-page",
+        "note": "last line of chunk @0 before the [1/2] marker; x2 at the full stop's ink edge dropped the full stop"
+      },
+      "raw": "#\n156\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n15\n0\n85214\n56\n1996532479\n1795214475284\n\n\nsons of Granuaile, the champions of Kathleen ni Houlihan\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 15,
+        "split": 0,
+        "position": 85214,
+        "length": 56
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-xii-chunk1-start",
+      "kind": "po",
+      "context": {
+        "how": "chunk @0 last page, one page turn forward",
+        "page": "XII chunk @1 first page",
+        "pageStartsWith": "—Perfectly true, says Bloom. But my point was…",
+        "statusLine": [
+          "XII (42/58)",
+          "37.2%"
+        ]
+      },
+      "raw": "1738611943423*15@1#0:37.2%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 15,
+        "split": 1,
+        "offset": 0,
+        "percent": "37.2",
+        "scroll": null
+      }
+    },
+    {
+      "id": "U3",
+      "kind": "probe",
+      "text": "Perfectly true, says Bloom.",
+      "screen": {
+        "from": [
+          200,
+          177
+        ],
+        "to": [
+          553,
+          177
+        ],
+        "line": 1
+      },
+      "context": {
+        "page": "po-xii-chunk1-start",
+        "note": "position 1: the chunk's first character (the dash) is position 0"
+      },
+      "raw": "#\n157\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n15\n1\n1\n27\n1996532479\n1795214570897\n\n\nPerfectly true, says Bloom.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 15,
+        "split": 1,
+        "position": 1,
+        "length": 27
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "U4",
+      "kind": "probe",
+      "text": "We are a long time waiting for that day, citizen, says Ned",
+      "screen": {
+        "from": [
+          150,
+          232
+        ],
+        "to": [
+          1049,
+          232
+        ],
+        "line": 2
+      },
+      "context": {
+        "page": "po-xii-chunk1-start",
+        "note": "position 51 = '—Perfectly … point was' (45) + U+FEFF U+200A U+FEFF '…' (4) + paragraph newline (1) + '—' (1): invisible characters count, a paragraph break is one character"
+      },
+      "raw": "#\n158\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n15\n1\n51\n58\n1996532479\n1795214587418\n\n\nWe are a long time waiting for that day, citizen, says Ned\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 15,
+        "split": 1,
+        "position": 51,
+        "length": 58
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-xv-chunk3-start",
+      "kind": "po",
+      "context": {
+        "page": "XV chunk @3 first page",
+        "pageStartsWith": "He touches the keys again. Minor chord comes now. Yes.",
+        "statusLine": [
+          "XV (68/147)",
+          "63.2%"
+        ]
+      },
+      "raw": "1738611943423*18@3#0:63.2%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 18,
+        "split": 3,
+        "offset": 0,
+        "percent": "63.2",
+        "scroll": null
+      }
+    },
+    {
+      "id": "U5",
+      "kind": "probe",
+      "text": "He touches the keys again.",
+      "screen": {
+        "from": [
+          110,
+          177
+        ],
+        "to": [
+          525,
+          177
+        ],
+        "line": 1
+      },
+      "context": {
+        "page": "po-xv-chunk3-start",
+        "note": "chunk @3 starts mid-paragraph after an opening <i> tag (the '>' fallback); rendered in roman, outside the table"
+      },
+      "raw": "#\n159\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n18\n3\n0\n26\n1996532479\n1795214776166\n\n\nHe touches the keys again.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 18,
+        "split": 3,
+        "position": 0,
+        "length": 26
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-xv-chunk2-last-page",
+      "kind": "po",
+      "context": {
+        "page": "XV chunk @2 last page (ends with the [3/7] marker)",
+        "pageStartsWith": "pkin? He mews. Luss puss puss puss!",
+        "statusLine": [
+          "XV (71/147)",
+          "60.6%"
+        ]
+      },
+      "raw": "1738611943423*18@2#44306:60.6%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 18,
+        "split": 2,
+        "offset": 44306,
+        "percent": "60.6",
+        "scroll": null
+      }
+    },
+    {
+      "id": "U6",
+      "kind": "probe",
+      "text": "m partially drunk, by the way.",
+      "screen": {
+        "from": [
+          70,
+          2067
+        ],
+        "to": [
+          563,
+          2067
+        ]
+      },
+      "context": {
+        "page": "po-xv-chunk2-last-page",
+        "note": "the last sentence of chunk @2; the long-press on 'I’m' started after the apostrophe"
+      },
+      "raw": "#\n160\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n18\n2\n46046\n30\n1996532479\n1795214846526\n\n\nm partially drunk, by the way.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 18,
+        "split": 2,
+        "position": 46046,
+        "length": 30
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "U7",
+      "kind": "probe",
+      "text": "Pretty pretty pretty pretty pretty pretty petticoats.",
+      "screen": {
+        "from": [
+          70,
+          810
+        ],
+        "to": [
+          860,
+          810
+        ]
+      },
+      "context": {
+        "page": "po-xv-chunk2-last-page"
+      },
+      "raw": "#\n161\nUlysses\n/sdcard/Books/MoonReader/TEST/TEST - ULYSSES.epub\n/sdcard/books/moonreader/test/test - ulysses.epub\n18\n2\n44756\n53\n1996532479\n1795214863193\n\n\nPretty pretty pretty pretty pretty pretty petticoats.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 18,
+        "split": 2,
+        "position": 44756,
+        "length": 53
+      },
+      "anHeader": [
+        "1438506",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-end-of-book",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → Uncopyright, 4 page turns forward (the last page is 2/2)",
+        "page": "last page of the book",
+        "note": "Moon+ writes '100%' without a decimal at the end of the book",
+        "statusLine": [
+          "Uncopyright (2/2)",
+          "100%"
+        ]
+      },
+      "raw": "1738611943423*24@0#1914:100%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 24,
+        "split": 0,
+        "offset": 1914,
+        "percent": "100",
+        "scroll": null
+      }
+    },
+    {
+      "id": "del-U1",
+      "kind": "deleted",
+      "context": {
+        "how": "Bookmarks panel → ⋮ → Delete, close",
+        "note": "header-less .an (no live notes left); the record keeps chapter and split"
+      },
+      "raw": "#\n0\n0\n0\n0\n15\n0\n83298\n0\n0\n1795214458989\n\n\n0\n0\n0\n*DELETED*\n",
+      "parsed": {
+        "chapter": 15,
+        "split": 0,
+        "position": 83298
+      }
+    },
+    {
+      "id": "del-U5",
+      "kind": "deleted",
+      "context": {
+        "how": "Bookmarks panel → ⋮ → Delete, close"
+      },
+      "raw": "#\n0\n0\n0\n0\n18\n3\n0\n0\n0\n1795214776166\n\n\n0\n0\n0\n*DELETED*\n",
+      "parsed": {
+        "chapter": 18,
+        "split": 3,
+        "position": 0
+      }
+    }
+  ]
+}

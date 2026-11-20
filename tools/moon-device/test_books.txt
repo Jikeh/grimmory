@@ -7,3 +7,4 @@ TEST - Le avventure di Pinocchio.epub
 TEST - Alices Adventures in Wonderland AZW.azw
 TEST - Alices Adventures in Wonderland MOBI.mobi
 TEST - CS FOR DUMMIES.pdf
+TEST - ULYSSES.epub

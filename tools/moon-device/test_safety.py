@@ -8,8 +8,10 @@ import moon_device as md
 REAL_BOOK = "Some Real Book.epub"
 ARGS = {
     "open": [REAL_BOOK], "restart": [REAL_BOOK], "read-to": [REAL_BOOK, "Chapter 1"],
+    "turn": [REAL_BOOK, "1"],
     "select": [REAL_BOOK, "1", "2", "3", "4"], "add-highlight": [REAL_BOOK, "1", "2", "3", "4", "n"],
     "edit-note": [REAL_BOOK, "1", "2", "n"], "delete-highlight": [REAL_BOOK, "1", "2", "trash"],
+    "delete-listed": [REAL_BOOK, "x"],
     "add-bookmark": [REAL_BOOK], "sync-up": [REAL_BOOK], "sync-down": [REAL_BOOK, "forced"],
     "answer-prompt": [REAL_BOOK, "ok"], "fetch": [REAL_BOOK],
 }

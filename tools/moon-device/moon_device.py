@@ -14,10 +14,12 @@ interface; command names follow the Moon+ emulator actions (ticket 09) so ticket
     smoke | dump [name] | ui [name] | position
     open <book> | close | force-stop | restart <book>
     read-to <book> <chapter title> [pages]
+    turn <book> [pages] [next|prev]
     select <book> <x1> <y1> <x2> <y2>
     add-highlight <book> <x1> <y1> <x2> <y2> [note]
     edit-note <book> <x> <y> <note>
     delete-highlight <book> <x> <y> trash|note-popup
+    delete-listed <book> <text>
     add-bookmark <book> [name]
     sync-up <book> | sync-down <book> normal|forced
     answer-prompt <book> ok|cancel [timeout]
@@ -318,7 +320,7 @@ def dismiss_popups(p: Phone) -> None:
     """Back out of any selection bar, dialog or dictionary until the plain page shows."""
     for _ in range(4):
         nodes = p.nodes()
-        if p.in_reader() and not any(p.find(rid=r, nodes=nodes) for r in ("HighlightBar", "buttonsLay", "noteEt")) \
+        if p.in_reader() and not any(p.find(rid=r, nodes=nodes) for r in ("HighlightBar", "buttonsLay", "noteEt", "bmListView01", "chListView01")) \
                 and not p.find(rid="android:id/button1", nodes=nodes) and not p.find(text="Exit", nodes=nodes):
             return
         p.back()
@@ -582,6 +584,20 @@ def cmd_read_to(p: Phone, book: str, chapter: str, pages: str = "0") -> dict:
     return {"book": book, **pos}
 
 
+def cmd_turn(p: Phone, book: str, pages: str = "1", direction: str = "next") -> dict:
+    """Turn `pages` pages forward (next) or back (prev) from the current page; reports the new position."""
+    if direction not in ("next", "prev"):
+        raise DriverError("direction must be 'next' or 'prev'")
+    require_reader(p, book)
+    dismiss_popups(p)
+    x = PAGE_TURN_TAP[0] if direction == "next" else 1080 - PAGE_TURN_TAP[0]
+    for _ in range(int(pages)):
+        p.tap(x, PAGE_TURN_TAP[1])
+        time.sleep(0.8)
+    p.step("turn", 1)
+    return {"book": book, **status(p)}
+
+
 def cmd_select(p: Phone, book: str, x1: str, y1: str, x2: str, y2: str) -> dict:
     """Select text from the word at (x1, y1) to the character before (x2, y2); leaves Moon+'s bar open."""
     require_reader(p, book)
@@ -671,6 +687,38 @@ def cmd_add_bookmark(p: Phone, book: str, name: str = "") -> dict:
     return {"book": book, "name": name or default}
 
 
+def cmd_delete_listed(p: Phone, book: str, text: str) -> dict:
+    """Delete every entry of the reader's Bookmarks panel (highlights, notes and bookmarks of this book)
+    whose listed text contains `text`, via its ⋮ menu → Delete (Moon+ deletes without asking)."""
+    require_reader(p, book)
+    dismiss_popups(p)
+    if not text.strip():
+        raise DriverError("text must not be empty")
+    open_more_operation(p, "Bookmarks")
+    if not p.wait_node(8, rid="bmListView01"):
+        raise DriverError("Bookmarks panel did not open")
+    p.step("bookmarks-panel", 0.5)
+    deleted = []
+    for _ in range(50):
+        nodes = p.nodes()
+        rows = [n for n in nodes if n.rid == ID + "tv1" and text in n.text]
+        if not rows:
+            break
+        row = rows[0]
+        # The row's ⋮ button shares the row's vertical band (it sits beside the time line above the text).
+        menu = next((n for n in nodes if n.rid == ID + "overflow1" and n.bounds[1] <= row.bounds[1] <= n.bounds[3] + 40
+                     and n.bounds[1] < row.bounds[3]), None)
+        if menu is None:
+            raise DriverError(f"no ⋮ button for {row.text!r}")
+        p.tap(*menu.center)
+        p.tap_node("Delete menu item", text="Delete")
+        time.sleep(1.2)
+        deleted.append(row.text)
+    p.step("deleted-listed", 0.5)
+    dismiss_popups(p)
+    return {"book": book, "deleted": deleted}
+
+
 def wait_prompt(p: Phone, timeout: float) -> Node | None:
     return p.wait_node(timeout, rid="android:id/message", contains="new reading position")
 
@@ -743,14 +791,15 @@ def cmd_fetch(_: Phone | None, book: str) -> dict:
 COMMANDS = {
     "smoke": cmd_smoke, "dump": cmd_dump, "ui": cmd_ui, "position": cmd_position,
     "open": cmd_open, "close": cmd_close, "force-stop": cmd_force_stop, "restart": cmd_restart,
-    "read-to": cmd_read_to, "select": cmd_select, "add-highlight": cmd_add_highlight,
-    "edit-note": cmd_edit_note, "delete-highlight": cmd_delete_highlight, "add-bookmark": cmd_add_bookmark,
+    "read-to": cmd_read_to, "turn": cmd_turn, "select": cmd_select, "add-highlight": cmd_add_highlight,
+    "edit-note": cmd_edit_note, "delete-highlight": cmd_delete_highlight,
+    "delete-listed": cmd_delete_listed, "add-bookmark": cmd_add_bookmark,
     "sync-up": cmd_sync_up, "sync-down": cmd_sync_down, "answer-prompt": cmd_answer_prompt,
     "fetch": cmd_fetch,
 }
 NO_PHONE = {"fetch"}
-BOOK_COMMANDS = {"open", "restart", "read-to", "select", "add-highlight", "edit-note", "delete-highlight",
-                 "add-bookmark", "sync-up", "sync-down", "answer-prompt", "fetch"}
+BOOK_COMMANDS = {"open", "restart", "read-to", "turn", "select", "add-highlight", "edit-note", "delete-highlight",
+                 "delete-listed", "add-bookmark", "sync-up", "sync-down", "answer-prompt", "fetch"}
 
 
 def run(command: str, args: list[str]) -> dict:

@@ -93,10 +93,12 @@ Run them with `just device run <command> [args]` (or `uv run python moon_device.
 | `force-stop` | — | `am force-stop` Moon+ |
 | `restart <book>` | restart app | force-stop, then `open` |
 | `read-to <book> <chapter> [pages]` | read to a position | chapter list → chapter start, then turn `pages` pages |
+| `turn <book> [pages] [next\|prev]` | turn pages | tap the right (next) or left (prev) edge `pages` times; reports the new position |
 | `select <book> x1 y1 x2 y2` | — | select text (see Calibration); leaves Moon+'s selection bar open |
 | `add-highlight <book> x1 y1 x2 y2 [note]` | add highlight | select → Highlight → OK (Moon+'s current style); optional note |
 | `edit-note <book> x y <note>` | edit highlight | tap the highlight at (x, y) → Note → replace the text → OK; reports `old_note` |
 | `delete-highlight <book> x y trash\|note-popup` | delete highlight | trash-bin icon in the highlight bar, or Note → Delete |
+| `delete-listed <book> <text>` | delete highlight | Bookmarks panel → every entry whose text contains `text` → ⋮ → Delete (no confirmation in Moon+); reports what it deleted |
 | `add-bookmark <book> [name]` | add bookmark | Bookmarks → ADD NEW BOOKMARK at the current page; default name is Moon+'s |
 | `sync-up <book>` | sync up | reader bar "Sync to cloud" (forced position upload) |
 | `sync-down <book> forced\|normal` | sync down | forced: reader bar "Sync from cloud"; normal: close + open. Reports `prompt` if the jump prompt shows |

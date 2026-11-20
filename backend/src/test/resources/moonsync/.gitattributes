@@ -1,3 +1,9 @@
 # Moon+ sync fixtures must reach the tests byte-for-byte.
 *.an binary
 *.po text eol=lf
+# Test books are committed unmodified (their SHA-256 is recorded in device/*.json).
+*.epub binary
+*.mobi binary
+*.azw binary
+*.pdf binary
+*.json text eol=lf
