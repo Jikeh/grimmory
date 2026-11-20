@@ -170,7 +170,8 @@ public final class MoonAnnotationFile {
             lines.addAll(source != null ? source : layout(record));
         }
         String text = String.join("\n", lines);
-        return trailingNewline ? text + "\n" : text;
+        // An empty last line (a bookmark's empty bak) needs the terminator, or readers drop it as a trailing newline.
+        return trailingNewline || lines.getLast().isEmpty() ? text + "\n" : text;
     }
 
     /** The zlib-compressed file content, ready to upload. */

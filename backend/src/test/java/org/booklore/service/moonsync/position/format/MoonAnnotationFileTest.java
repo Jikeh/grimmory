@@ -366,6 +366,20 @@ class MoonAnnotationFileTest {
         }
 
         @Test
+        void endsWithANewlineWhenTheLastLineIsEmptyEvenIfTheSourceDidNot() throws IOException {
+            // readsync and hand-built files have no final "\n"; a bookmark's empty bak column written last would
+            // otherwise be read back (here and by Moon+'s readLine) as that missing terminator.
+            MoonAnnotationFile file = MoonAnnotationFile.parse(fixture("annotations_epub_sample.an"));
+            MoonAnnotationRecord bookmark = MoonAnnotationFile.parse(zlib(HEADER + BOOKMARK)).records().getFirst();
+            List<MoonAnnotationRecord> records = List.of(file.records().getFirst(), bookmark);
+
+            String text = file.withRecords(records).toText();
+
+            assertThat(text).endsWith("\n0\n0\n\n");
+            assertThat(MoonAnnotationFile.parseText(text).records()).containsExactlyElementsOf(records);
+        }
+
+        @Test
         void aNewFileIsWrittenTheWayMoonWritesIt() {
             String deletedHighlight = "#\n0\n0\n0\n0\n12\n0\n300\n0\n0\n1784406712345\n\na one-line note\n0\n0\n0\n*DELETED*\n";
             String export = HEADER + HIGHLIGHT + BOOKMARK + deletedHighlight;
