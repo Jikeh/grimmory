@@ -1,0 +1,306 @@
+{
+  "book": {
+    "moonFileName": "TEST - Le avventure di Pinocchio.epub",
+    "resource": null,
+    "notCommittedBecause": "De Agostini edition (ISBN 9788851130961); the 1883 text is public domain but this edition is not clearly free to redistribute. Keep a local copy with this SHA-256 to run tests that need it.",
+    "format": "EPUB",
+    "edition": "Carlo Collodi, Le avventure di Pinocchio — De Agostini EPUB (Sigil), Italian, NFC text with accents, « » and curly apostrophes",
+    "structure": "Spine: cover, colophon, frontespizio, indice, pre, Section0001_0001..0036, diz, titoli_collana. NCX (41 entries): Copertina, Colophon, Frontespizio, Capitolo uno..trentasei, Dizionarietto, Indice — so the NCX order differs from the spine (Indice is spine 3 but the last navPoint) and pre.xhtml / titoli_collana.xhtml have no navPoint.",
+    "sha256": "28538fa85396f3193b6a4a1830a008677aa9188c601d182e3d492e76bc2ffdb7",
+    "size": 1123285
+  },
+  "moonVersion": "10.8",
+  "device": "Samsung Galaxy S25 (SM-S931B), Android 17, 1080x2340; Moon+ Reader Pro 10.8, automatic Drive sync",
+  "display": "The user's Moon+ settings (font serif 18.0, line spacing 3, left/right margins 10, top 20, bottom 16), portrait 1080x2340.",
+  "notes": [
+    "Chapter index follows the NCX, not the spine: 'Capitolo uno' is chapter 3 (NCX ordinal 3; spine index 5) and 'Indice' is chapter 40.",
+    "Reading order follows the NCX too: Frontespizio (1 page) is followed directly by Capitolo uno; indice.xhtml and pre.xhtml are not shown there.",
+    "The last NCX entry, 'Indice', is a chapter of ~130 pages: indice.xhtml, then pre.xhtml, then every chapter again, Dizionarietto and titoli_collana.xhtml to the end of the spine. Its probe 'quel punto fu bussato alla porta.' (Capitolo due's first line) is at 40@0 offset 5578; a naive concatenation of the tag-stripped bodies of indice + pre + Section1 + Section2 puts it at 5577. The status line shows 99.2% while on its page 4.",
+    "That merged chapter is split into chunks: the end of the book is 40@2#65889. Concatenating the raw bodies from indice.xhtml on predicts 3 chunks, matching the split index, but the last chunk's naive text is only ~64,026 chars, so Moon+'s assembly of this chapter adds something the plain concatenation doesn't (unknown).",
+    "Accented letters (precomposed, NFC), guillemets « », curly apostrophes and '…' count as one character each: every probe in Capitolo uno matches a whitespace-collapsed tag-strip of Section0001_0001.xhtml exactly (14, 127, 138, 506, 552).",
+    "Word selection breaks at the curly apostrophe and after a drop cap: long-pressing 'era' after the drop cap 'C’' selected from 'una'."
+  ],
+  "captures": [
+    {
+      "id": "po-capitolo-uno-start",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → Capitolo uno, close",
+        "page": "Capitolo uno page 1/2",
+        "statusLine": [
+          "Capitolo uno (1/2)",
+          "1.4%"
+        ]
+      },
+      "raw": "1738611943423*3@0#0:1.4%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 3,
+        "split": 0,
+        "offset": 0,
+        "percent": "1.4",
+        "scroll": null
+      }
+    },
+    {
+      "id": "Pi1",
+      "kind": "probe",
+      "text": "Capitolo uno",
+      "screen": {
+        "from": [
+          450,
+          202
+        ],
+        "to": [
+          670,
+          202
+        ]
+      },
+      "context": {
+        "page": "po-capitolo-uno-start",
+        "note": "the <h1> heading is at 0; the chapter title paragraph follows at 14"
+      },
+      "raw": "#\n182\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n3\n0\n0\n12\n1996532479\n1795217950200\n\n\nCapitolo uno\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 3,
+        "split": 0,
+        "position": 0,
+        "length": 12
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Pi2",
+      "kind": "probe",
+      "text": "Come andò che maestro Ciliegia",
+      "screen": {
+        "from": [
+          180,
+          287
+        ],
+        "to": [
+          936,
+          287
+        ]
+      },
+      "context": {
+        "page": "po-capitolo-uno-start",
+        "note": "x2 at the comma's ink edge dropped the comma"
+      },
+      "raw": "#\n183\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n3\n0\n14\n30\n1996532479\n1795217967096\n\n\nCome andò che maestro Ciliegia\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 3,
+        "split": 0,
+        "position": 14,
+        "length": 30
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Pi6",
+      "kind": "probe",
+      "text": "una volta…",
+      "screen": {
+        "from": [
+          240,
+          595
+        ],
+        "to": [
+          393,
+          595
+        ]
+      },
+      "context": {
+        "page": "po-capitolo-uno-start",
+        "note": "after the drop cap 'C’' (a separate <span>); the long-press on 'era' started at 'una'"
+      },
+      "raw": "#\n187\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n3\n0\n127\n10\n1996532479\n1795218034871\n\n\nuna volta…\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 3,
+        "split": 0,
+        "position": 127,
+        "length": 10
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Pi3",
+      "kind": "probe",
+      "text": "«Un re!» diranno subito i miei piccoli lettori",
+      "screen": {
+        "from": [
+          100,
+          658
+        ],
+        "to": [
+          808,
+          658
+        ]
+      },
+      "context": {
+        "page": "po-capitolo-uno-start",
+        "note": "guillemets are single characters"
+      },
+      "raw": "#\n184\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n3\n0\n138\n46\n1996532479\n1795217985353\n\n\n«Un re!» diranno subito i miei piccoli lettori\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 3,
+        "split": 0,
+        "position": 138,
+        "length": 46
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Pi5",
+      "kind": "probe",
+      "text": "capitò nella bottega",
+      "screen": {
+        "from": [
+          450,
+          1028
+        ],
+        "to": [
+          728,
+          1028
+        ]
+      },
+      "context": {
+        "page": "po-capitolo-uno-start"
+      },
+      "raw": "#\n186\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n3\n0\n506\n20\n1996532479\n1795218018382\n\n\ncapitò nella bottega\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 3,
+        "split": 0,
+        "position": 506,
+        "length": 20
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Pi4",
+      "kind": "probe",
+      "text": "il quale aveva nome mastr’Antonio,",
+      "screen": {
+        "from": [
+          162,
+          1081
+        ],
+        "to": [
+          738,
+          1081
+        ]
+      },
+      "context": {
+        "page": "po-capitolo-uno-start"
+      },
+      "raw": "#\n185\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n3\n0\n552\n34\n1996532479\n1795218001676\n\n\nil quale aveva nome mastr’Antonio,\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 3,
+        "split": 0,
+        "position": 552,
+        "length": 34
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-indice-p4",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → Dizionarietto, 6 page turns forward (Dizionarietto 3 pages, then Indice)",
+        "page": "Indice page 4/130 — the end of Capitolo uno and the start of Capitolo due",
+        "statusLine": [
+          "Indice (4/130)",
+          "99.2%"
+        ]
+      },
+      "raw": "1738611943423*40@0#4586:99.2%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 40,
+        "split": 0,
+        "offset": 4586,
+        "percent": "99.2",
+        "scroll": null
+      }
+    },
+    {
+      "id": "Pi7",
+      "kind": "probe",
+      "text": "quel punto fu bussato alla porta.",
+      "screen": {
+        "from": [
+          180,
+          1482
+        ],
+        "to": [
+          676,
+          1482
+        ]
+      },
+      "context": {
+        "page": "po-indice-p4",
+        "note": "Capitolo due's first line, inside chapter 40 (Indice); the drop cap 'I' is not part of the selection"
+      },
+      "raw": "#\n188\nLe avventure di Pinocchio\n/sdcard/Books/MoonReader/TEST/TEST - Le avventure di Pinocchio.epub\n/sdcard/books/moonreader/test/test - le avventure di pinocchio.epub\n40\n0\n5578\n33\n1996532479\n1795218251868\n\n\nquel punto fu bussato alla porta.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 40,
+        "split": 0,
+        "position": 5578,
+        "length": 33
+      },
+      "anHeader": [
+        "1123285",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-end-of-book",
+      "kind": "po",
+      "context": {
+        "how": "Indice page 4, 140 page turns forward",
+        "page": "last page: the series list from titoli_collana.xhtml",
+        "statusLine": [
+          "Indice (128/129)",
+          "100%"
+        ]
+      },
+      "raw": "1738611943423*40@2#65889:100%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 40,
+        "split": 2,
+        "offset": 65889,
+        "percent": "100",
+        "scroll": null
+      }
+    }
+  ]
+}
