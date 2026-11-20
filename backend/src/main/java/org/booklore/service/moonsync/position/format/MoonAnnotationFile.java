@@ -29,8 +29,9 @@ import java.util.zip.ZipException;
  * plus every live row) followed by {@code BookDb.deletedNotesToText} (the in-memory deleted-notes list), every
  * line terminated by {@code \n}. {@code exportNotesToText} writes nothing at all, header included, once a book has
  * no live rows left, so the file uploaded after deleting a book's last highlight or bookmark is only deleted-notes
- * records with no header. Such files parse with an empty {@link #header()}; they can't be written back with live
- * records until a header is supplied, since Moon+'s import reads the book size from it.
+ * records with no header. Such files parse with an empty {@link #header()}. Moon+ itself can't import them
+ * ({@code importNotesFromText} reads the book size from line 0), so writing requires a header
+ * ({@link #withHeader}).
  *
  * <p>Records are read the way {@code BookDb.importNotesFromText} reads them: the 16 lines after a {@code #} by
  * position, so a column that is itself a lone {@code #} (a highlight of just "#") doesn't split the record.
@@ -39,7 +40,10 @@ import java.util.zip.ZipException;
  *
  * <p>Rewrites are verbatim: a record that comes back unchanged through {@link #withRecords} is written with the
  * exact lines it was read from, so bookmarks and records this parser reads leniently (e.g. readsync's
- * 15-line tombstone sample) survive untouched. Only new or changed records are written in Moon+'s 16-line layout.
+ * 15-line tombstone sample) survive untouched. Only new or changed records are written in Moon+'s 16-line layout,
+ * and every one of their fields must be a single line, deleted-notes notes included: Moon+ reads by fixed index,
+ * so a multi-line field would shift its columns. Encoding line breaks as {@code <BR>} is the caller's job
+ * (ticket 02).
  * Round-trips are defined on the decompressed text; zlib bytes may differ from Moon+'s.
  *
  * <p>The PDF {@code .an} sub-format (tagged {@code #A*#} fields) is recognized only to be rejected: Moon+ sync
@@ -150,13 +154,15 @@ public final class MoonAnnotationFile {
     /**
      * The decompressed file content.
      *
-     * @throws IllegalStateException when the file has no header but holds live records
+     * @throws IllegalStateException when the file has no header, or one Moon+ can't import (see
+     *                               {@link MoonAnnotationHeader#requireImportable()})
      */
     public String toText() {
-        if (header == null && records.stream().anyMatch(r -> !r.isDeleted())) {
-            throw new IllegalStateException("A Moon+ .an file with live records needs a header; Moon+'s import reads the book size from it");
+        if (header == null) {
+            throw new IllegalStateException("A Moon+ .an file needs a header to be written; Moon+'s import reads the book size from line 0");
         }
-        List<String> lines = new ArrayList<>(header == null ? List.of() : header.lines());
+        header.requireImportable();
+        List<String> lines = new ArrayList<>(header.lines());
         for (MoonAnnotationRecord record : records) {
             lines.add(RECORD_DELIMITER);
             List<String> source = sourceLines.get(record);
@@ -273,7 +279,6 @@ public final class MoonAnnotationFile {
 
     /** Moon+'s 16-line layout for one record. */
     private static List<String> layout(MoonAnnotationRecord r) {
-        boolean deleted = r.isDeleted();
         List<String> lines = new ArrayList<>(RECORD_LINES);
         addSingleLine(lines, "id", r.id());
         addSingleLine(lines, "filename", r.filename());
@@ -286,19 +291,9 @@ public final class MoonAnnotationFile {
         lines.add(Integer.toString(r.color()));
         lines.add(Long.toString(r.time()));
         addSingleLine(lines, "bookmark", r.bookmark());
-        if (deleted) {
-            // BookDb.deletedNotesToText writes the note unescaped; parseRecord reads the extra lines back as note.
-            // A multi-line record is found by scanning for the next '#', so none of its lines may be a lone '#'.
-            String[] noteLines = r.note().split("\n", -1);
-            for (String noteLine : noteLines) {
-                if (noteLines.length > 1 && noteLine.equals(RECORD_DELIMITER)) {
-                    throw new IllegalArgumentException("Moon+ .an multi-line note must not contain a lone '#' line");
-                }
-                lines.add(noteLine);
-            }
-        } else {
-            addSingleLine(lines, "note", r.note());
-        }
+        // Single line even on deleted-notes records: BookDb.deletedNotesToText writes notes unescaped, but
+        // importNotesFromText reads by fixed index, so an extra line shifts the *DELETED* marker out of slot 16.
+        addSingleLine(lines, "note", r.note());
         addSingleLine(lines, "text", r.text());
         addSingleLine(lines, "underline", r.underline());
         addSingleLine(lines, "strikethrough", r.strikethrough());
@@ -306,9 +301,10 @@ public final class MoonAnnotationFile {
         return lines;
     }
 
+    /** Moon+ splits the file with {@code BufferedReader.readLine}, which breaks on {@code \r} as well as {@code \n}. */
     private static void addSingleLine(List<String> lines, String field, String value) {
-        if (value.indexOf('\n') >= 0) {
-            throw new IllegalArgumentException("Moon+ .an " + field + " field must not contain a newline");
+        if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) {
+            throw new IllegalArgumentException("Moon+ .an " + field + " field must not contain a line break");
         }
         lines.add(value);
     }

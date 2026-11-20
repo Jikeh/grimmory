@@ -334,19 +334,20 @@ class MoonAnnotationFileTest {
                 assertThat(r.isDeleted()).isTrue();
                 assertThat(r.offset()).isEqualTo(55140);
             });
-            assertThat(file.toText()).isEqualTo(deletedOnly);
         }
 
         @Test
-        void refusesToWriteLiveRecordsIntoAHeaderlessFile() {
+        void refusesToWriteAHeaderlessFileBecauseMoonCannotImportIt() {
+            // BookDb.importNotesFromText reads the book size from line 0 with Integer.valueOf.
             String deletedOnly = "#\n0\n0\n0\n0\n10\n1\n55140\n0\n0\n1784406703372\n\n\n0\n0\n0\n*DELETED*\n";
             MoonAnnotationFile file = MoonAnnotationFile.parse(zlib(deletedOnly));
             List<MoonAnnotationRecord> records = new ArrayList<>(file.records());
             records.add(highlight("1", 2, 0, 5, "text"));
 
-            assertThatThrownBy(() -> file.withRecords(records).toText()).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(file::toText).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> file.withRecords(records).toBytes()).isInstanceOf(IllegalStateException.class);
             assertThat(file.withRecords(records).withHeader(new MoonAnnotationHeader("1000", true, true)).toText())
-                    .startsWith("1000\nindent:true\ntrim:true\n#\n0\n");
+                    .startsWith("1000\nindent:true\ntrim:true\n" + deletedOnly + "#\n1\n");
         }
 
         @Test
@@ -366,10 +367,25 @@ class MoonAnnotationFileTest {
 
         @Test
         void aNewFileIsWrittenTheWayMoonWritesIt() {
+            String deletedHighlight = "#\n0\n0\n0\n0\n12\n0\n300\n0\n0\n1784406712345\n\na one-line note\n0\n0\n0\n*DELETED*\n";
+            String export = HEADER + HIGHLIGHT + BOOKMARK + deletedHighlight;
             MoonAnnotationFile file = MoonAnnotationFile.of(new MoonAnnotationHeader("334344", true, false),
-                    MoonAnnotationFile.parse(zlib(EXPORT)).records());
+                    MoonAnnotationFile.parse(zlib(export)).records());
 
-            assertThat(file.toText()).isEqualTo(EXPORT);
+            assertThat(file.toText()).isEqualTo(export);
+        }
+
+        @Test
+        void refusesToRewriteAChangedDeletedRecordWithAMultiLineNote() {
+            // Moon+'s own multi-line deleted note is kept verbatim while unchanged, but a new or changed record
+            // must be single-line: importNotesFromText would read the second note line as the text column.
+            MoonAnnotationFile file = MoonAnnotationFile.parse(zlib(EXPORT));
+            List<MoonAnnotationRecord> records = new ArrayList<>(file.records());
+            records.set(2, records.get(2).withColor(5));
+
+            assertThatThrownBy(() -> file.withRecords(records).toText())
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("note");
         }
     }
 
@@ -393,12 +409,38 @@ class MoonAnnotationFileTest {
         }
 
         @Test
-        void refusesALoneHashLineInAMultiLineDeletedNote() {
+        void refusesAMultiLineNoteOnANewDeletedRecord() {
             MoonAnnotationRecord deleted = new MoonAnnotationRecord("0", "0", "0", "0", 1, 0, 5, 0, 0, 1L,
-                    "", "a\n#\nb", "0", "0", "0", MoonAnnotationRecord.DELETED_MARKER);
+                    "", "a\nb", "0", "0", "0", MoonAnnotationRecord.DELETED_MARKER);
 
             assertThatThrownBy(() -> MoonAnnotationFile.of(new MoonAnnotationHeader("1", true, true), List.of(deleted)).toText())
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("note");
+        }
+
+        @Test
+        void refusesACarriageReturnBecauseMoonSplitsLinesOnIt() {
+            MoonAnnotationRecord broken = highlight("1", 0, 0, 0, "one\rtwo");
+
+            assertThatThrownBy(() -> MoonAnnotationFile.of(new MoonAnnotationHeader("1", true, true), List.of(broken)).toText())
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("text");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"", "abc", "-5", "12.5", "99999999999"})
+        void refusesToWriteATotalLengthMoonCannotRead(String totalLength) {
+            MoonAnnotationFile file = MoonAnnotationFile.of(new MoonAnnotationHeader(totalLength, true, true), List.of());
+
+            assertThatThrownBy(file::toText)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("total length");
+        }
+
+        @Test
+        void stillParsesATotalLengthMoonCannotRead() {
+            assertThat(MoonAnnotationFile.parse(zlib("abc\nindent:true\ntrim:true\n")).header().orElseThrow().totalLength())
+                    .isEqualTo("abc");
         }
 
         @Test
