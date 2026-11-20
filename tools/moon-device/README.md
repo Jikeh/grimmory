@@ -10,6 +10,9 @@ its UI and app lifecycle.
 Recipes run from the repo root with `just device <recipe>`. Without `just`, run the same commands from
 this folder: `uv run python moon_device.py <command> [args]`, `uv run python scenarios.py <name>`.
 
+**Testing something with Moon+? Read [PLAYBOOK.md](PLAYBOOK.md) first.** It covers the working loop,
+the traps from earlier sessions and the known Moon+ controls.
+
 Verified with: Samsung Galaxy S25 (Android 17, 1080×2340), Moon+ Reader Pro 10.8.
 
 ## One-time setup
@@ -83,6 +86,7 @@ Run them with `just device run <command> [args]` (or `uv run python moon_device.
 |---|---|---|
 | `smoke` | — | device, Android and Moon+ version; opens Moon+ |
 | `dump [name]` | — | capture whatever is on screen |
+| `ui [name]` | — | capture, plus the foreground activity and a compact widget list (id, text, bounds) |
 | `position` | report position | the reader's status line |
 | `open <book>` | open book / sync down (normal) | opens the book via Moon+'s file intent; Moon+ downloads the cloud position/notes and clears its deleted-notes list |
 | `close` | sync up | leaves the reader; Moon+ uploads the `.po` (and the `.an` when notes changed) |

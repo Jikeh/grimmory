@@ -11,7 +11,7 @@ Every command prints one JSON object ({"ok": ..., "steps": [...captures...], ...
 success, 1 on failure (with "error" and a "failure_capture" path). See README.md for the full
 interface; command names follow the Moon+ emulator actions (ticket 09) so ticket 15 can wrap them.
 
-    smoke | dump [name] | position
+    smoke | dump [name] | ui [name] | position
     open <book> | close | force-stop | restart <book>
     read-to <book> <chapter title> [pages]
     select <book> <x1> <y1> <x2> <y2>
@@ -463,6 +463,25 @@ def cmd_dump(p: Phone, name: str = "dump") -> dict:
     return {}
 
 
+def cmd_ui(p: Phone, name: str = "ui") -> dict:
+    """Capture the screen and list its widgets compactly (Moon+ ids without the package prefix):
+    the quickest way to find what to tap when exploring a new Moon+ screen."""
+    p.step(name, 0)
+    xml = Path(p.steps[-1]).with_suffix(".xml").read_text(encoding="utf-8")
+    skip = ("com.android.systemui", "com.samsung.", "com.sec.android.")
+    widgets = []
+    for m in NODE_RE.finditer(xml):
+        a = dict(ATTR_RE.findall(m.group(0)))
+        if a.get("package", "").startswith(skip):
+            continue
+        if not (a.get("resource-id") or a.get("text") or a.get("content-desc") or a.get("clickable") == "true"):
+            continue
+        widgets.append(" | ".join([a.get("class", "").rsplit(".", 1)[-1], a.get("resource-id", "").replace(ID, ""),
+                                   a.get("text", "")[:60], a.get("content-desc", "")[:40], a.get("bounds", ""),
+                                   "clk" if a.get("clickable") == "true" else ""]))
+    return {"foreground": p.foreground(), "widgets": widgets}
+
+
 def cmd_position(p: Phone) -> dict:
     """Report the reader's current position from its status line (chapter, page within it, percent)."""
     if not p.in_reader():
@@ -722,7 +741,7 @@ def cmd_fetch(_: Phone | None, book: str) -> dict:
 
 
 COMMANDS = {
-    "smoke": cmd_smoke, "dump": cmd_dump, "position": cmd_position,
+    "smoke": cmd_smoke, "dump": cmd_dump, "ui": cmd_ui, "position": cmd_position,
     "open": cmd_open, "close": cmd_close, "force-stop": cmd_force_stop, "restart": cmd_restart,
     "read-to": cmd_read_to, "select": cmd_select, "add-highlight": cmd_add_highlight,
     "edit-note": cmd_edit_note, "delete-highlight": cmd_delete_highlight, "add-bookmark": cmd_add_bookmark,

@@ -15,3 +15,8 @@ Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-f
 ### Domain docs
 
 Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Real-device Moon+ testing
+
+To check Moon+ Reader behaviour on the user's phone, use the driver in `tools/moon-device/`: read its
+`PLAYBOOK.md` first (safety rules, working loop, known traps), then `README.md` for the commands.
