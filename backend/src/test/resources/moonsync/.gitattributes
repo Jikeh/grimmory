@@ -1,0 +1,3 @@
+# Moon+ sync fixtures must reach the tests byte-for-byte.
+*.an binary
+*.po text eol=lf

@@ -30,6 +30,13 @@ test:
 test-class test_class:
     {{ gradle }} test --tests "{{ test_class }}" --no-daemon --parallel --build-cache
 
+# Run backend tests in the JDK 25 Gradle image from dev.docker-compose.yml, optionally narrowed by a Gradle test filter, for example `just test-docker 'org.booklore.service.BookServiceTest'`.
+test-docker filter='':
+    docker compose -f ../dev.docker-compose.yml run --rm --no-deps -T backend sh -c 'cd /backend && ./gradlew test --no-daemon --build-cache {{ if filter == "" { "" } else { "--tests \"" + filter + "\"" } }}'
+
+# Run the Moon+ sync position conversion library tests (.po/.an formats and later position math) in Docker.
+test-moon-position: (test-docker 'org.booklore.service.moonsync.position.*')
+
 # Run tests and generate JaCoCo coverage output.
 coverage:
     {{ gradle }} test jacocoTestReport --no-daemon --parallel --build-cache
