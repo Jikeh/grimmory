@@ -1,0 +1,695 @@
+{
+  "book": {
+    "moonFileName": "TEST - Pride  Prejudice.epub",
+    "resource": null,
+    "notCommittedBecause": "Amazon Digital Services edition (Amazon cover art); the text is public domain but this packaging is not clearly free to redistribute. Keep a local copy with this SHA-256 to run tests that need it.",
+    "format": "EPUB",
+    "edition": "Jane Austen, Pride and Prejudice — Calibre conversion of a public-domain edition (cover reads 'A Public Domain Book')",
+    "structure": "62 spine items (titlepage.xhtml + Pride__Prejudice_split_000..060.html). The NCX has 61 navPoints, 'Chapter 1' -> split_000.html#filepos2884 (a mid-file anchor after a table of contents), 'Chapter n' -> split_(n-1).html. No chapter exceeds 100,000 chars, so split is always 0.",
+    "sha256": "2e3911fb64a5228bca8de04a70424168a1e2257138247050a0a31a2e060f82eb",
+    "size": 407595
+  },
+  "moonVersion": "10.8",
+  "device": "Samsung Galaxy S25 (SM-S931B), Android 17, 1080x2340; Moon+ Reader Pro 10.8, automatic Drive sync",
+  "display": "Baseline and the chapter captures: the user's Moon+ settings — font serif 18.0, line spacing 3, left/right margins 10, top margin 20, bottom margin 16, colour CCCCCC on 000000, portrait 1080x2340. INV1 captures: font 24.0, line spacing 12, left/right margins 60 (others unchanged). INV2 captures: original settings, landscape 2340x1080. Settings were restored afterwards.",
+  "notes": [
+    "Chapter index is an ordinal into Moon+'s chapter list: chapter 0 is everything before the first NCX navPoint (titlepage.xhtml's cover image plus the table of contents at the head of split_000.html, listed by Moon+ under the book title 'Pride & Prejudice'); chapter 1 starts at the #filepos2884 anchor inside split_000.html, not at the file start; chapter n (n>=2) is split_(n-1).html.",
+    "Chapter 1 offsets count from the anchor: 'any of them, Mr. Bingle' (ticket 00) is at 1919, against ~1921 from a naive tag-strip of the text after the anchor and ~2603 from the file start.",
+    "Chapter 0's .po at its first page is 0@0#1 (not #0): the chapter opens with the cover image.",
+    "The chapter heading is part of the chapter text: 'Chapter 2' is at position 0.",
+    "A paragraph break is one character in Moon+'s text and is stored as <BR> in the highlighted text.",
+    "Invariance: the same text got the same position at the baseline settings, at font 24 / line spacing 12 / margins 60 (INV1) and in landscape (INV2): 'I hope…' 396, the heading 0, 'Mrs. Bennet deigned…' 934, 'Mary wished…' 2508, 'To-morrow fortnight.' 1346 ('morrow' 1349). Highlights made at one setting render on the same words at the others.",
+    "The .po offset was the page's first character at the baseline (1993 = 'their chance;') and in landscape (1368 = the quote before 'Aye' at 1369), but at line spacing 12 it was 534 while the page began with 'mother' at 500 (534 is the start of the page's second line).",
+    "Lost notes: a highlight created at the same (chapter, split, position) as an existing note can disappear without a *DELETED* record. Seen three times: (a) a heading highlight at 2/0/0 where the bookmark 'Driver bookmark 2' already was — both vanished from the next upload and from Moon+'s list; (b) highlights re-created at 2/0/0 and 2/0/396 while the cloud .an still held *DELETED* records for those positions — gone after the next resume; (c) a highlight re-created at 2/0/934 likewise — exported once, then gone. Once the cloud .an no longer held the *DELETED* records, the same highlights stuck. Likely cause: Moon+ downloads and imports the cloud .an when the reader resumes (opening the dictionary on long-press pauses and resumes it), and the import deletes local notes by (chapter, split, position) (BookDb.importNotesFromText / removeNote's position-only fallback).",
+    "Opening the dictionary app from a long-press pauses Moon+, which then syncs to the cloud (the user saw Moon+'s sync toasts): every probe made with the driver causes an intermediate upload."
+  ],
+  "captures": [
+    {
+      "id": "po-chapter0-start",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → 'Pride & Prejudice' (first entry), close",
+        "page": "chapter 0 first page: cover image, then 'Table of Contents'",
+        "statusLine": [
+          "Pride & Prejudice (1/3)",
+          "0.0%"
+        ]
+      },
+      "raw": "1738611943423*0@0#1:0.0%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 0,
+        "split": 0,
+        "offset": 1,
+        "percent": "0.0",
+        "scroll": null
+      }
+    },
+    {
+      "id": "P0a",
+      "kind": "probe",
+      "text": "Table of Contents",
+      "screen": {
+        "from": [
+          120,
+          1721
+        ],
+        "to": [
+          400,
+          1721
+        ]
+      },
+      "context": {
+        "page": "po-chapter0-start"
+      },
+      "raw": "#\n162\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n0\n0\n3\n17\n1996532479\n1795215492700\n\n\nTable of Contents\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 0,
+        "split": 0,
+        "position": 3,
+        "length": 17
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "P0b",
+      "kind": "probe",
+      "text": "Chapter 9",
+      "screen": {
+        "from": [
+          110,
+          2198
+        ],
+        "to": [
+          252,
+          2198
+        ]
+      },
+      "context": {
+        "page": "po-chapter0-start",
+        "note": "table-of-contents link lines are 10 chars apart ('Chapter n' + newline); the &nbsp; spacer line after the title is not in Moon+'s text"
+      },
+      "raw": "#\n163\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n0\n0\n101\n9\n1996532479\n1795215508589\n\n\nChapter 9\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 0,
+        "split": 0,
+        "position": 101,
+        "length": 9
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-chapter1-start",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → Chapter 1, close",
+        "statusLine": [
+          "Chapter 1 (1/3)",
+          "0.0%"
+        ]
+      },
+      "raw": "1738611943423*1@0#0:0.0%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 1,
+        "split": 0,
+        "offset": 0,
+        "percent": "0.0",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-chapter61-start",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → Chapter 61, close",
+        "statusLine": [
+          "Chapter 61 (1/4)",
+          "98.8%"
+        ]
+      },
+      "raw": "1738611943423*61@0#0:98.8%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 61,
+        "split": 0,
+        "offset": 0,
+        "percent": "98.8",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-end-of-book",
+      "kind": "po",
+      "context": {
+        "how": "Chapter 61 start, 6 page turns forward (last page 4/4), close",
+        "statusLine": [
+          "Chapter 61 (4/4)",
+          "100%"
+        ]
+      },
+      "raw": "1738611943423*61@0#6797:100%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 61,
+        "split": 0,
+        "offset": 6797,
+        "percent": "100",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-baseline-ch2-p2",
+      "kind": "po",
+      "context": {
+        "settings": "baseline",
+        "page": "Chapter 2 page 2/3",
+        "pageStartsWith": "their chance; and, therefore, as she will think it an act of kind-",
+        "statusLine": [
+          "Chapter 2 (2/3)",
+          "1.1%"
+        ]
+      },
+      "raw": "1738611943423*2@0#1993:1.1%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 2,
+        "split": 0,
+        "offset": 1993,
+        "percent": "1.1",
+        "scroll": null
+      }
+    },
+    {
+      "id": "P1",
+      "kind": "probe",
+      "text": "I hope Mr. Bingley will like it, Lizzy.\"",
+      "screen": {
+        "from": [
+          110,
+          618
+        ],
+        "to": [
+          689,
+          618
+        ],
+        "line": 9
+      },
+      "context": {
+        "settings": "baseline",
+        "page": "Chapter 2 page 1/3",
+        "note": "long-press on '\"I' starts after the opening quote"
+      },
+      "raw": "#\n164\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n396\n40\n1996532479\n1795215740092\n\n\nI hope Mr. Bingley will like it, Lizzy.\"\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 396,
+        "length": 40
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "P3",
+      "kind": "probe",
+      "screen": {
+        "from": [
+          120,
+          1203
+        ],
+        "to": [
+          916,
+          1362
+        ]
+      },
+      "context": {
+        "settings": "baseline",
+        "page": "Chapter 2 page 1/3",
+        "note": "across a paragraph break: stored with <BR>, length counts the break as one character"
+      },
+      "text": "Mrs. Bennet deigned not to make any reply, but, unable to contain herself, began scolding one of her daughters.<BR>\"Don't keep coughing so, Kitty, for Heaven's sake! Have a little compassion on my nerves. You tear them to pieces.\"",
+      "raw": "#\n166\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n934\n227\n1996532479\n1795215774695\n\n\nMrs. Bennet deigned not to make any reply, but, unable to contain herself, began scolding one of her daughters.<BR>\"Don't keep coughing so, Kitty, for Heaven's sake! Have a little compassion on my nerves. You tear them to pieces.\"\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 934,
+        "length": 227
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "P4",
+      "kind": "probe",
+      "text": "their chance;",
+      "screen": {
+        "from": [
+          40,
+          171
+        ],
+        "to": [
+          239,
+          171
+        ],
+        "line": 1
+      },
+      "context": {
+        "settings": "baseline",
+        "page": "po-baseline-ch2-p2",
+        "note": "first word on the page = the .po offset"
+      },
+      "raw": "#\n167\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n1993\n13\n1996532479\n1795215847607\n\n\ntheir chance;\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 1993,
+        "length": 13
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "P5",
+      "kind": "probe",
+      "text": "Mary wished to say something sensible, but knew not how.",
+      "screen": {
+        "from": [
+          120,
+          700
+        ],
+        "to": [
+          1046,
+          700
+        ]
+      },
+      "context": {
+        "settings": "baseline",
+        "page": "po-baseline-ch2-p2"
+      },
+      "raw": "#\n168\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n2508\n56\n1996532479\n1795215870781\n\n\nMary wished to say something sensible, but knew not how.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 2508,
+        "length": 56
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "P2",
+      "kind": "probe",
+      "text": "Chapter 2",
+      "screen": {
+        "from": [
+          480,
+          194
+        ],
+        "to": [
+          621,
+          194
+        ],
+        "line": 1
+      },
+      "context": {
+        "settings": "baseline",
+        "page": "Chapter 2 page 1/3",
+        "note": "first attempt vanished together with 'Driver bookmark 2' at the same position (see notes); this is the re-made one"
+      },
+      "raw": "#\n169\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n0\n9\n1996532479\n1795215974229\n\n\nChapter 2\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 0,
+        "length": 9
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-inv1-ch2-p2",
+      "kind": "po",
+      "context": {
+        "settings": "INV1",
+        "page": "Chapter 2 page 2/9",
+        "pageStartsWith": "mother resentfully, \"since we are",
+        "note": "offset 534 is the second line's start; 'mother' (first word on the page) is at 500",
+        "statusLine": [
+          "Chapter 2 (2/9)",
+          "0.8%"
+        ]
+      },
+      "raw": "1738611943423*2@0#534:0.8%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 2,
+        "split": 0,
+        "offset": 534,
+        "percent": "0.8",
+        "scroll": null
+      }
+    },
+    {
+      "id": "I3",
+      "kind": "probe",
+      "text": "mother",
+      "screen": {
+        "from": [
+          220,
+          177
+        ],
+        "to": [
+          220,
+          177
+        ],
+        "line": 1
+      },
+      "context": {
+        "settings": "INV1",
+        "page": "po-inv1-ch2-p2"
+      },
+      "raw": "#\n172\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n500\n6\n1996532479\n1795217202076\n\n\nmother\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 500,
+        "length": 6
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "I5",
+      "kind": "probe",
+      "text": "We are not in a way to know",
+      "screen": {
+        "from": [
+          290,
+          2001
+        ],
+        "to": [
+          921,
+          2001
+        ]
+      },
+      "context": {
+        "settings": "INV1",
+        "page": "Chapter 2 page 1/9"
+      },
+      "raw": "#\n175\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n438\n27\n1996532479\n1795217313760\n\n\nWe are not in a way to know\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 438,
+        "length": 27
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "I1",
+      "kind": "probe",
+      "text": "I hope Mr. Bingley will like it, Lizzy.\"",
+      "screen": {
+        "from": [
+          262,
+          1763
+        ],
+        "to": [
+          289,
+          1882
+        ]
+      },
+      "context": {
+        "settings": "INV1",
+        "page": "Chapter 2 page 1/9",
+        "sameTextAs": "P1"
+      },
+      "raw": "#\n176\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n396\n40\n1996532479\n1795217377466\n\n\nI hope Mr. Bingley will like it, Lizzy.\"\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 396,
+        "length": 40
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "I2",
+      "kind": "probe",
+      "text": "Chapter 2",
+      "screen": {
+        "from": [
+          440,
+          208
+        ],
+        "to": [
+          647,
+          208
+        ]
+      },
+      "context": {
+        "settings": "INV1",
+        "page": "Chapter 2 page 1/9",
+        "sameTextAs": "P2"
+      },
+      "raw": "#\n177\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n0\n9\n1996532479\n1795217395552\n\n\nChapter 2\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 0,
+        "length": 9
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "I4",
+      "kind": "probe",
+      "screen": {
+        "from": [
+          280,
+          1843
+        ],
+        "to": [
+          378,
+          2199
+        ]
+      },
+      "context": {
+        "settings": "INV1",
+        "page": "Chapter 2 page 2/9",
+        "sameTextAs": "P3 (same start; this selection ran on to '\"Don't')"
+      },
+      "text": "Mrs. Bennet deigned not to make any reply, but, unable to contain herself, began scolding one of her daughters.<BR>\"Don't",
+      "raw": "#\n178\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n934\n118\n1996532479\n1795217418002\n\n\nMrs. Bennet deigned not to make any reply, but, unable to contain herself, began scolding one of her daughters.<BR>\"Don't\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 934,
+        "length": 118
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-inv1-retry-ch2-p2",
+      "kind": "po",
+      "context": {
+        "settings": "INV1",
+        "page": "Chapter 2 page 2/9",
+        "statusLine": [
+          "Chapter 2 (2/9)",
+          "0.8%"
+        ]
+      },
+      "raw": "1738611943423*2@0#534:0.8%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 2,
+        "split": 0,
+        "offset": 534,
+        "percent": "0.8",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-inv2-ch2-p2",
+      "kind": "po",
+      "context": {
+        "settings": "INV2",
+        "page": "Chapter 2 page 2/3 (landscape)",
+        "pageStartsWith": "\"Aye, so it is,\" cried her mother",
+        "statusLine": [
+          "Chapter 2 (2/3)",
+          "1.0%"
+        ]
+      },
+      "raw": "1738611943423*2@0#1368:1.0%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 2,
+        "split": 0,
+        "offset": 1368,
+        "percent": "1.0",
+        "scroll": null
+      }
+    },
+    {
+      "id": "L1",
+      "kind": "probe",
+      "text": "morrow fortnight.",
+      "screen": {
+        "from": [
+          260,
+          963
+        ],
+        "to": [
+          556,
+          963
+        ],
+        "screenSize": [
+          2340,
+          1080
+        ]
+      },
+      "context": {
+        "settings": "INV2",
+        "page": "Chapter 2 page 1/3 (landscape)",
+        "note": "long-press on 'To-morrow' selected from 'morrow'; ticket 00 put 'To-morrow fortnight.' at 1346 = 1349 - 3"
+      },
+      "raw": "#\n179\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n1349\n17\n1996532479\n1795217594794\n\n\nmorrow fortnight.\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 1349,
+        "length": 17
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "L2",
+      "kind": "probe",
+      "text": "Aye",
+      "screen": {
+        "from": [
+          260,
+          144
+        ],
+        "to": [
+          260,
+          144
+        ],
+        "screenSize": [
+          2340,
+          1080
+        ]
+      },
+      "context": {
+        "settings": "INV2",
+        "page": "po-inv2-ch2-p2",
+        "note": "the .po (1368) is the opening quote just before it"
+      },
+      "raw": "#\n180\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n1369\n3\n1996532479\n1795217630393\n\n\nAye\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 1369,
+        "length": 3
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "L3",
+      "kind": "probe",
+      "text": "Mary wished to say something sensible, but knew not how",
+      "screen": {
+        "from": [
+          240,
+          727
+        ],
+        "to": [
+          1147,
+          727
+        ],
+        "screenSize": [
+          2340,
+          1080
+        ]
+      },
+      "context": {
+        "settings": "INV2",
+        "page": "po-inv2-ch2-p2",
+        "sameTextAs": "P5"
+      },
+      "raw": "#\n181\nPride & Prejudice\n/sdcard/Books/MoonReader/TEST/TEST - Pride  Prejudice.epub\n/sdcard/books/moonreader/test/test - pride  prejudice.epub\n2\n0\n2508\n55\n1996532479\n1795217649268\n\n\nMary wished to say something sensible, but knew not how\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 2,
+        "split": 0,
+        "position": 2508,
+        "length": 55
+      },
+      "anHeader": [
+        "407595",
+        "indent:true",
+        "trim:true"
+      ]
+    }
+  ]
+}

@@ -9,9 +9,12 @@ The format facts they prove are written up in `docs/moon-sync/moon-format-refere
 ## Files
 
 - `device/<book>.json`: one file per test book.
-- `books/<book>.<ext>`: the public-domain test books, **unmodified** (renamed from Moon+'s `TEST - …` file
-  name; the SHA-256 in the fixture is the file's). The commercial PDF is not committed: its fixture names the
-  book and its hash, and tests that need the file skip when it is absent.
+- `books/<book>.<ext>`: the test books that are clearly free to redistribute, **unmodified** (renamed from
+  Moon+'s `TEST - …` file name; the SHA-256 in the fixture is the file's): Ulysses (Standard Ebooks, CC0) and
+  Alice AZW (Project Gutenberg #19033). The others are not committed — the commercial PDF, and editions whose
+  packaging isn't clearly free (Pride and Prejudice: Amazon; Pinocchio: De Agostini; Alice MOBI: Global Grey).
+  Their fixtures have `"resource": null`, a `notCommittedBecause` reason and the file's SHA-256; tests that
+  need the file look for it locally and skip when it is absent.
 
 ## Shape
 

@@ -81,7 +81,7 @@ import uiautomator2 as u2  # noqa: E402  (must come after ADBUTILS_ADB_PATH is s
 # "Sync from cloud" / "Sync to cloud" appears, so a moved button fails instead of pressing something else.
 SYNC_DOWN_BUTTON = int(os.environ.get("MOON_SYNC_DOWN_BUTTON", "-3"))
 SYNC_UP_BUTTON = int(os.environ.get("MOON_SYNC_UP_BUTTON", "-1"))
-PAGE_TURN_TAP = (980, 1200)  # right side of the page: next page (left of Samsung's edge-panel handle)
+PAGE_TURN_TAP = (980, 2275)  # bottom-right, below the last text line: next page (clear of highlights; left of Samsung's edge-panel handle)
 MENU_TAP = (540, 1170)  # page centre: toggles Moon+'s top/bottom bars
 
 
@@ -559,6 +559,17 @@ def cmd_read_to(p: Phone, book: str, chapter: str, pages: str = "0") -> dict:
     if not p.wait_node(8, rid="chListView01"):
         raise DriverError("chapter list did not open")
     p.step("chapters", 0.5)
+    # The list opens at the current chapter; scroll to the top first so earlier chapters are found too.
+    first = None
+    for _ in range(30):
+        nodes = p.nodes()
+        titles = [n.text for n in nodes if n.rid == ID + "chapter_list_tv"]
+        if titles and titles[0] == first:
+            break
+        first = titles[0] if titles else None
+        x1, y1, x2, y2 = p.find(rid="chListView01", nodes=nodes).bounds
+        p.drag((x1 + x2) // 2, y1 + 150, (x1 + x2) // 2, y2 - 150, 300)
+        time.sleep(0.6)
     entry = None
     for _ in range(30):
         nodes = p.nodes()
