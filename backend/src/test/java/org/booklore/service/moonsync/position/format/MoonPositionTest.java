@@ -164,6 +164,7 @@ class MoonPositionTest {
                 "1738611943423*14:3.6%",
                 "1738611943423*14:3.6%|7",
                 "1738611943423*2@0#15:12.345%",
+                "1738611943423*2@0#15:12.3%|-48",
         })
         void writesBackExactlyWhatWasRead(String text) {
             assertThat(MoonPosition.parse(text).serialize()).isEqualTo(text);

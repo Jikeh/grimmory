@@ -16,15 +16,15 @@ import java.util.Objects;
  *  5 chapter       NCX-derived chapter index
  *  6 split         split chunk within the chapter
  *  7 offset        start offset into the chunk's rendered text
- *  8 length        highlighted length
- *  9 color         packed ARGB colour
+ *  8 length        highlighted length; on bookmark rows, the bookmark's colour
+ *  9 color         packed ARGB highlight colour
  * 10 time          created, epoch millis
  * 11 bookmark      bookmark name; non-empty only on bookmark rows
  * 12 note          note text
  * 13 text          highlighted text ("original")
  * 14 underline     0/1
  * 15 strikethrough 0/1
- * 16 bak           "*DELETED*" on deleted-notes records
+ * 16 bak           squiggly-underline flag ("1"/"0") on live rows; "*DELETED*" on deleted-notes records
  * </pre>
  * Values are kept exactly as stored. Live rows escape newlines as {@code <BR>}; deleted-notes records
  * ({@code BookDb.deletedNotesToText}) write their bookmark and note unescaped, so on those records {@code note}

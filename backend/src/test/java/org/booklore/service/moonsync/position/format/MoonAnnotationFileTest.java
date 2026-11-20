@@ -2,6 +2,8 @@ package org.booklore.service.moonsync.position.format;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,10 +20,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Ports readsync's {@code tests/unit/test_an_parser.py} (EPUB cases) with its original inputs and expected
  * outputs, and adds the Moon+-shaped cases readsync never covered: bookmark records, deleted-notes records
- * with unescaped newlines, and verbatim rewrites.
+ * with unescaped newlines, header-less deleted-only uploads, positional record reading, and verbatim rewrites.
  *
- * <p>readsync's PDF {@code .an} cases are not ported: PDF highlights are out of scope for Moon+ sync, so the
- * parser recognizes the PDF sub-format only to reject it clearly.
+ * <p>readsync's PDF {@code .an} parsing cases are replaced by rejection cases on the same fixtures: PDF highlights
+ * are out of scope for Moon+ sync (a listed deviation in the spec), so the parser recognizes the PDF sub-format
+ * only to reject it clearly.
  *
  * <p>Note-slot content (escaping, multi-line notes on live records) is completed in ticket 02; the cases here
  * only use the empty note slot every readsync sample has, plus the raw deleted-notes shape.
@@ -144,7 +147,7 @@ class MoonAnnotationFileTest {
 
         @Test
         void parsesTheHeaderLikeTheMoonMdTable() throws IOException {
-            MoonAnnotationHeader header = MoonAnnotationFile.parse(fixture("annotations_epub_sample.an")).header();
+            MoonAnnotationHeader header = MoonAnnotationFile.parse(fixture("annotations_epub_sample.an")).header().orElseThrow();
 
             assertThat(header.totalLength()).isEqualTo("415");
             assertThat(header.indent()).isTrue();
@@ -165,7 +168,7 @@ class MoonAnnotationFileTest {
 
             MoonAnnotationFile reparsed = MoonAnnotationFile.parse(MoonAnnotationFile.of(header, records).toBytes());
 
-            assertThat(reparsed.header()).isEqualTo(header);
+            assertThat(reparsed.header()).contains(header);
             assertThat(reparsed.records()).isEqualTo(records);
         }
 
@@ -198,10 +201,11 @@ class MoonAnnotationFileTest {
                     .containsExactly("0", "0", "0");
         }
 
-        @Test
-        void rejectsThePdfSubFormatClearly() {
-            // readsync parses PDF .an files; Moon+ sync syncs EPUB highlights only (spec, "Highlights").
-            assertThatThrownBy(() -> MoonAnnotationFile.parse(fixture("annotations_pdf_sample.an")))
+        @ParameterizedTest
+        @ValueSource(strings = {"annotations_pdf_sample.an", "annotations_pdf_tombstone.an"})
+        void rejectsThePdfSubFormatClearly(String name) {
+            // Deviation: readsync parses PDF .an files; Moon+ sync syncs EPUB highlights only.
+            assertThatThrownBy(() -> MoonAnnotationFile.parse(fixture(name)))
                     .isInstanceOf(MoonFormatException.class)
                     .hasMessageContaining("PDF");
         }
@@ -238,7 +242,7 @@ class MoonAnnotationFileTest {
 
         @Test
         void readsTheHeaderFlags() {
-            MoonAnnotationHeader header = MoonAnnotationFile.parse(zlib(EXPORT)).header();
+            MoonAnnotationHeader header = MoonAnnotationFile.parse(zlib(EXPORT)).header().orElseThrow();
 
             assertThat(header.totalLength()).isEqualTo("334344");
             assertThat(header.indent()).isTrue();
@@ -318,6 +322,49 @@ class MoonAnnotationFileTest {
         }
 
         @Test
+        void readsTheHeaderlessFileMoonUploadsAfterTheLastNoteIsDeleted() {
+            // BookDb.exportNotesToText returns "" once no live rows are left; Sync.uploadCloudNoteFile still
+            // uploads the deleted-notes list on its own.
+            String deletedOnly = "#\n0\n0\n0\n0\n10\n1\n55140\n0\n0\n1784406703372\n\n\n0\n0\n0\n*DELETED*\n";
+
+            MoonAnnotationFile file = MoonAnnotationFile.parse(zlib(deletedOnly));
+
+            assertThat(file.header()).isEmpty();
+            assertThat(file.records()).singleElement().satisfies(r -> {
+                assertThat(r.isDeleted()).isTrue();
+                assertThat(r.offset()).isEqualTo(55140);
+            });
+            assertThat(file.toText()).isEqualTo(deletedOnly);
+        }
+
+        @Test
+        void refusesToWriteLiveRecordsIntoAHeaderlessFile() {
+            String deletedOnly = "#\n0\n0\n0\n0\n10\n1\n55140\n0\n0\n1784406703372\n\n\n0\n0\n0\n*DELETED*\n";
+            MoonAnnotationFile file = MoonAnnotationFile.parse(zlib(deletedOnly));
+            List<MoonAnnotationRecord> records = new ArrayList<>(file.records());
+            records.add(highlight("1", 2, 0, 5, "text"));
+
+            assertThatThrownBy(() -> file.withRecords(records).toText()).isInstanceOf(IllegalStateException.class);
+            assertThat(file.withRecords(records).withHeader(new MoonAnnotationHeader("1000", true, true)).toText())
+                    .startsWith("1000\nindent:true\ntrim:true\n#\n0\n");
+        }
+
+        @Test
+        void readsRecordsByPositionSoALoneHashColumnDoesNotSplitThem() {
+            // BookDb.importNotesFromText reads the 16 lines after '#' by index; a highlight of just "#" is
+            // exported as a lone '#' line.
+            String hashHighlight = "#\n83\nbook.epub\n/p\n/p\n3\n0\n40\n1\n1996532479\n1784406700000\n\n\n#\n0\n0\n0\n";
+            String text = HEADER + hashHighlight + HIGHLIGHT;
+
+            MoonAnnotationFile file = MoonAnnotationFile.parse(zlib(text));
+
+            assertThat(file.records()).hasSize(2);
+            assertThat(file.records().getFirst().text()).isEqualTo("#");
+            assertThat(file.toText()).isEqualTo(text);
+            assertThat(MoonAnnotationFile.of(file.header().orElseThrow(), file.records()).toText()).isEqualTo(text);
+        }
+
+        @Test
         void aNewFileIsWrittenTheWayMoonWritesIt() {
             MoonAnnotationFile file = MoonAnnotationFile.of(new MoonAnnotationHeader("334344", true, false),
                     MoonAnnotationFile.parse(zlib(EXPORT)).records());
@@ -336,6 +383,22 @@ class MoonAnnotationFileTest {
             assertThatThrownBy(() -> MoonAnnotationFile.parse(zlib(HEADER + "#\n1\nbook.epub\n/p\n/p\n0\n0\n")))
                     .isInstanceOf(MoonFormatException.class)
                     .hasMessageContaining("record 1");
+        }
+
+        @Test
+        void reportsTheDeletedRecordMinimumLength() {
+            assertThatThrownBy(() -> MoonAnnotationFile.parse(zlib(HEADER + "#\n0\n0\n0\n0\n1\n0\n5\n0\n0\n1\n0\n*DELETED*\n")))
+                    .isInstanceOf(MoonFormatException.class)
+                    .hasMessageContaining("at least 14");
+        }
+
+        @Test
+        void refusesALoneHashLineInAMultiLineDeletedNote() {
+            MoonAnnotationRecord deleted = new MoonAnnotationRecord("0", "0", "0", "0", 1, 0, 5, 0, 0, 1L,
+                    "", "a\n#\nb", "0", "0", "0", MoonAnnotationRecord.DELETED_MARKER);
+
+            assertThatThrownBy(() -> MoonAnnotationFile.of(new MoonAnnotationHeader("1", true, true), List.of(deleted)).toText())
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test

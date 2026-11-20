@@ -10,10 +10,11 @@ final class MoonPositionGrammar {
 
     private static final String DEVICE = "(?<device>\\d+)";
     private static final String PERCENT = ":(?<percent>\\d+(?:\\.\\d+)?)%";
-    private static final String SCROLL = "(?:\\|(?<scroll>\\d+))?";
+    private static final String SCROLL = "(?:\\|(?<scroll>-?\\d+))?";
     static final Pattern EPUB = Pattern.compile(DEVICE + "\\*(?<chapter>\\d+)@(?<split>\\d+)#(?<offset>\\d+)" + PERCENT + SCROLL);
     static final Pattern PDF = Pattern.compile(DEVICE + "\\*(?<page>\\d+)" + PERCENT + SCROLL);
     private static final Pattern DIGITS = Pattern.compile("\\d+");
+    private static final Pattern SIGNED_DIGITS = Pattern.compile("-?\\d+");
     private static final Pattern DECIMAL = Pattern.compile("\\d+(?:\\.\\d+)?");
 
     private MoonPositionGrammar() {
@@ -28,8 +29,8 @@ final class MoonPositionGrammar {
         if (!DECIMAL.matcher(percentText).matches()) {
             throw new IllegalArgumentException("Moon+ percent must be a plain decimal: " + percentText);
         }
-        if (webViewScrollOffset != null && !DIGITS.matcher(webViewScrollOffset).matches()) {
-            throw new IllegalArgumentException("Moon+ WebView scroll offset must be digits: " + webViewScrollOffset);
+        if (webViewScrollOffset != null && !SIGNED_DIGITS.matcher(webViewScrollOffset).matches()) {
+            throw new IllegalArgumentException("Moon+ WebView scroll offset must be an integer: " + webViewScrollOffset);
         }
     }
 

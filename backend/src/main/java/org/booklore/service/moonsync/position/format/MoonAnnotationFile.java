@@ -1,5 +1,7 @@
 package org.booklore.service.moonsync.position.format;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -14,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
@@ -24,7 +27,15 @@ import java.util.zip.ZipException;
  *
  * <p>Layout, as Moon+ uploads it ({@code Sync.uploadCloudNoteFile}): {@code BookDb.exportNotesToText} (header
  * plus every live row) followed by {@code BookDb.deletedNotesToText} (the in-memory deleted-notes list), every
- * line terminated by {@code \n}.
+ * line terminated by {@code \n}. {@code exportNotesToText} writes nothing at all, header included, once a book has
+ * no live rows left, so the file uploaded after deleting a book's last highlight or bookmark is only deleted-notes
+ * records with no header. Such files parse with an empty {@link #header()}; they can't be written back with live
+ * records until a header is supplied, since Moon+'s import reads the book size from it.
+ *
+ * <p>Records are read the way {@code BookDb.importNotesFromText} reads them: the 16 lines after a {@code #} by
+ * position, so a column that is itself a lone {@code #} (a highlight of just "#") doesn't split the record.
+ * Records that aren't 16 lines followed by a {@code #} or the end of the file are read up to the next {@code #}:
+ * deleted-notes records with multi-line notes, and the lenient shapes readsync accepts.
  *
  * <p>Rewrites are verbatim: a record that comes back unchanged through {@link #withRecords} is written with the
  * exact lines it was read from, so bookmarks and records this parser reads leniently (e.g. readsync's
@@ -43,14 +54,14 @@ public final class MoonAnnotationFile {
     private static final int FIXED_TAIL_LINES = 3;
     private static final String PDF_TAG = "#A*#";
 
-    private final MoonAnnotationHeader header;
+    private final @Nullable MoonAnnotationHeader header;
     private final List<MoonAnnotationRecord> records;
     private final Map<MoonAnnotationRecord, List<String>> sourceLines;
     private final boolean trailingNewline;
 
-    private MoonAnnotationFile(MoonAnnotationHeader header, List<MoonAnnotationRecord> records,
+    private MoonAnnotationFile(@Nullable MoonAnnotationHeader header, List<MoonAnnotationRecord> records,
                                Map<MoonAnnotationRecord, List<String>> sourceLines, boolean trailingNewline) {
-        this.header = Objects.requireNonNull(header, "header");
+        this.header = header;
         this.records = List.copyOf(records);
         this.sourceLines = sourceLines;
         this.trailingNewline = trailingNewline;
@@ -58,7 +69,7 @@ public final class MoonAnnotationFile {
 
     /** A new file written entirely in Moon+'s layout. */
     public static MoonAnnotationFile of(MoonAnnotationHeader header, List<MoonAnnotationRecord> records) {
-        return new MoonAnnotationFile(header, records, Map.of(), true);
+        return new MoonAnnotationFile(Objects.requireNonNull(header, "header"), records, Map.of(), true);
     }
 
     /** Decompresses and parses an {@code .an} file. */
@@ -77,12 +88,15 @@ public final class MoonAnnotationFile {
         if (trailingNewline) {
             lines.removeLast();
         }
-        if (lines.size() < 3) {
-            throw new MoonFormatException(".an header must have 3 lines, found " + lines.size());
+        MoonAnnotationHeader header = null;
+        List<String> body = lines;
+        if (!lines.getFirst().equals(RECORD_DELIMITER)) {
+            if (lines.size() < 3) {
+                throw new MoonFormatException(".an header must have 3 lines, found " + lines.size());
+            }
+            header = parseHeader(lines.get(0), lines.get(1), lines.get(2));
+            body = lines.subList(3, lines.size());
         }
-        MoonAnnotationHeader header = parseHeader(lines.get(0), lines.get(1), lines.get(2));
-
-        List<String> body = lines.subList(3, lines.size());
         if (!body.isEmpty() && !body.getFirst().equals(RECORD_DELIMITER)) {
             throw new MoonFormatException(".an body must start with a '#' record delimiter, found \"" + body.getFirst() + "\"");
         }
@@ -90,9 +104,12 @@ public final class MoonAnnotationFile {
         Map<MoonAnnotationRecord, List<String>> sourceLines = new HashMap<>();
         int start = 0;
         while (start < body.size()) {
-            int end = start + 1;
-            while (end < body.size() && !body.get(end).equals(RECORD_DELIMITER)) {
-                end++;
+            int end = start + 1 + RECORD_LINES;
+            if (end > body.size() || (end < body.size() && !body.get(end).equals(RECORD_DELIMITER))) {
+                end = start + 1;
+                while (end < body.size() && !body.get(end).equals(RECORD_DELIMITER)) {
+                    end++;
+                }
             }
             List<String> recordLines = List.copyOf(body.subList(start + 1, end));
             MoonAnnotationRecord record = parseRecord(records.size() + 1, recordLines);
@@ -103,8 +120,9 @@ public final class MoonAnnotationFile {
         return new MoonAnnotationFile(header, records, Map.copyOf(sourceLines), trailingNewline);
     }
 
-    public MoonAnnotationHeader header() {
-        return header;
+    /** The header, or empty for a file holding only deleted-notes records (see the class comment). */
+    public Optional<MoonAnnotationHeader> header() {
+        return Optional.ofNullable(header);
     }
 
     /** Every record in file order: highlights, bookmarks and deleted-notes records. */
@@ -129,9 +147,16 @@ public final class MoonAnnotationFile {
         return new MoonAnnotationFile(newHeader, records, sourceLines, trailingNewline);
     }
 
-    /** The decompressed file content. */
+    /**
+     * The decompressed file content.
+     *
+     * @throws IllegalStateException when the file has no header but holds live records
+     */
     public String toText() {
-        List<String> lines = new ArrayList<>(header.lines());
+        if (header == null && records.stream().anyMatch(r -> !r.isDeleted())) {
+            throw new IllegalStateException("A Moon+ .an file with live records needs a header; Moon+'s import reads the book size from it");
+        }
+        List<String> lines = new ArrayList<>(header == null ? List.of() : header.lines());
         for (MoonAnnotationRecord record : records) {
             lines.add(RECORD_DELIMITER);
             List<String> source = sourceLines.get(record);
@@ -198,7 +223,7 @@ public final class MoonAnnotationFile {
         boolean deleted = n > 0 && lines.getLast().equals(MoonAnnotationRecord.DELETED_MARKER);
         int minimum = deleted ? FIXED_HEAD_LINES + 1 + FIXED_TAIL_LINES : RECORD_LINES;
         if (n < minimum) {
-            throw new MoonFormatException(".an record " + number + " has " + n + " lines, expected " + RECORD_LINES);
+            throw new MoonFormatException(".an record " + number + " has " + n + " lines, expected " + (deleted ? "at least " + minimum : RECORD_LINES));
         }
         List<String> middle = lines.subList(FIXED_HEAD_LINES, n - FIXED_TAIL_LINES);
         String bookmark;
@@ -263,8 +288,12 @@ public final class MoonAnnotationFile {
         addSingleLine(lines, "bookmark", r.bookmark());
         if (deleted) {
             // BookDb.deletedNotesToText writes the note unescaped; parseRecord reads the extra lines back as note.
-            for (String noteLine : r.note().split("\n", -1)) {
-                requireNotDelimiter("note", noteLine);
+            // A multi-line record is found by scanning for the next '#', so none of its lines may be a lone '#'.
+            String[] noteLines = r.note().split("\n", -1);
+            for (String noteLine : noteLines) {
+                if (noteLines.length > 1 && noteLine.equals(RECORD_DELIMITER)) {
+                    throw new IllegalArgumentException("Moon+ .an multi-line note must not contain a lone '#' line");
+                }
                 lines.add(noteLine);
             }
         } else {
@@ -281,13 +310,6 @@ public final class MoonAnnotationFile {
         if (value.indexOf('\n') >= 0) {
             throw new IllegalArgumentException("Moon+ .an " + field + " field must not contain a newline");
         }
-        requireNotDelimiter(field, value);
         lines.add(value);
-    }
-
-    private static void requireNotDelimiter(String field, String line) {
-        if (line.equals(RECORD_DELIMITER)) {
-            throw new IllegalArgumentException("Moon+ .an " + field + " field must not be a lone '#' line");
-        }
     }
 }
