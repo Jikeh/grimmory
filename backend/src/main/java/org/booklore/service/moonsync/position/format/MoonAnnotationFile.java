@@ -170,7 +170,8 @@ public final class MoonAnnotationFile {
             lines.addAll(source != null ? source : layout(record));
         }
         String text = String.join("\n", lines);
-        // An empty last line (a bookmark's empty bak) needs the terminator, or readers drop it as a trailing newline.
+        // An empty last field (e.g. a caller-built record with an empty bak) needs the terminator, or readers drop it
+        // as a trailing newline.
         return trailingNewline || lines.getLast().isEmpty() ? text + "\n" : text;
     }
 

@@ -226,7 +226,7 @@ class MoonAnnotationFileTest {
                 + "Gran parte, infatti, della letteratura del passato\n0\n0\n0\n";
         private static final String BOOKMARK = "#\n82\n1984 - George Orwell_107.epub\n/sdcard/Books/1984 - George Orwell_107.epub\n"
                 + "/sdcard/books/1984 - george orwell_107.epub\n4\n0\n1200\n-16776961\n1996532479\n1784406709999\n"
-                + "Chapter 4: It was a bright cold day\n\n\n0\n0\n\n";
+                + "Chapter 4: It was a bright cold day\n\n\n0\n0\n0\n";
         private static final String DELETED_WITH_MULTILINE_NOTE = "#\n0\n0\n0\n0\n12\n0\n300\n0\n0\n1784406712345\n\n"
                 + "first line of the note\nsecond line of the note\n0\n0\n0\n*DELETED*\n";
 
@@ -367,11 +367,13 @@ class MoonAnnotationFileTest {
 
         @Test
         void endsWithANewlineWhenTheLastLineIsEmptyEvenIfTheSourceDidNot() throws IOException {
-            // readsync and hand-built files have no final "\n"; a bookmark's empty bak column written last would
-            // otherwise be read back (here and by Moon+'s readLine) as that missing terminator.
+            // readsync and hand-built files have no final "\n"; an empty last field (here a caller-built record with
+            // an empty bak; Moon+ itself always stores "0"/"1") would otherwise be read back, here and by Moon+'s
+            // readLine, as that missing terminator.
             MoonAnnotationFile file = MoonAnnotationFile.parse(fixture("annotations_epub_sample.an"));
-            MoonAnnotationRecord bookmark = MoonAnnotationFile.parse(zlib(HEADER + BOOKMARK)).records().getFirst();
-            List<MoonAnnotationRecord> records = List.of(file.records().getFirst(), bookmark);
+            MoonAnnotationRecord emptyBak = new MoonAnnotationRecord("2", "book.epub", "/p", "/p", 1, 0, 5, 4, 1, 1L,
+                    "", "", "text", "0", "0", "");
+            List<MoonAnnotationRecord> records = List.of(file.records().getFirst(), emptyBak);
 
             String text = file.withRecords(records).toText();
 
