@@ -12,7 +12,8 @@ Every fact carries its source:
 - **[readsync]**: from readsync's notes (`docs/connectors/moon*.md` in the readsync repo), not re-checked here.
 - **[unknown]**: not settled; says what is missing.
 
-Fixtures: `ulysses.json`, `pride-and-prejudice.json`, `pinocchio.json` (EPUB). MOBI, AZW and PDF are
+Fixtures: `ulysses.json`, `pride-and-prejudice.json`, `pinocchio.json` (EPUB), `alice-mobi.json` (MOBI6),
+`alice-azw.json` (MOBI6+KF8). PDF is
 **not surveyed yet** (see the end).
 
 ## Files
@@ -205,6 +206,13 @@ The export also keeps only notes that match Moon+'s current annotation list by (
   before the first navPoint is chapter 0"; this adds that it crosses files and that the anchor splits a file.
 - **The `.po` offset isn't always the page's first character** (line spacing 12). readsync treats it as the
   first visible character.
+- **MOBI chapter → `filepos` is off by one** where front matter precedes the first NCX entry: readsync's
+  `resolve_mobi_chapter_filepos` takes `fileposes[chapter]`, but Moon+ chapter *n* is NCX entry *n−1*
+  (Alice MOBI).
+- **MOBI chapter order is the NCX tree flattened in document order**, not the INDX record order readsync's
+  `mobi6_chapter_fileposes` returns (Alice AZW: 2 chapters apart).
+- readsync adds the `.po` `offset` (rendered characters) to a byte `filepos`; it is characters, so that sum
+  is only approximate.
 - **`100%` without a decimal** at the end of a book.
 - **Forced "Sync to cloud" can upload a stale position.**
 - **Lost notes at a shared (chapter, split, position)**: new.
@@ -212,12 +220,32 @@ The export also keeps only notes that match Moon+'s current annotation list by (
   per-chunk offset reset and the `[n/N]` marker; NCX-ordinal chapter index; invisible characters and
   paragraph breaks counting one each.
 
+## MOBI family
+
+Test files: `TEST - Alices Adventures in Wonderland MOBI.mobi` is **MOBI6** (file version 6, no KF8 section);
+`TEST - Alices Adventures in Wonderland AZW.azw` is a **joint MOBI6+KF8** file (`BOUNDARY` record, KF8 from
+record 66, EXTH 121), from Project Gutenberg #19033. [file headers; fixtures `alice-mobi.json`,
+`alice-azw.json`]
+
+- **Same `.po` grammar, chapter list and offsets as EPUB.** Moon+ loads MOBI-family files through its EPUB code
+  path (`Epub` over `MyZip_Mobi` / the native `MLoader`) [readsync, decompiled]. On the device: chapter starts
+  are `{n}@0#0`, headings are at 0, `.po` is the page's first character, and the end of the book is `100%`.
+  [device: alice-mobi `po-chapter1-start`, `A1`, `A4`, `po-end-of-book`]
+- **`offset` is rendered characters, not bytes**: probes are 2–4 characters from a naive character count of
+  the decoded text starting at the chapter's NCX `filepos`, while a byte count would be off by 2 for every
+  curly quote or dash. [device: alice-mobi `A2`–`A5`]
+- **Chapter 0 is the front matter before the first NCX entry** (listed under the book title), so Moon+
+  chapter *n* is NCX entry *n−1* in MOBI6 Alice (chapter 1 = filepos 6177). [device: alice-mobi]
+- **The chapter list is the NCX tree flattened in document order**, not the order of the compiled NCX
+  (`INDX`) records. In the AZW, the copyright entry is the last INDX record but a child of "SAM'L GABRIEL
+  SONS…", and Moon+ lists it 4th, so "I—DOWN THE RABBIT-HOLE" is chapter 5. [device: alice-azw
+  `po-chapter-i-start`]
+- **Images count** in MOBI text as in EPUB: chapter 0 opening with a cover image is `0@0#1`, and the first
+  line after an illustration is 3 characters further than a naive count. [device: alice-azw]
+- [unknown] **Which half of a joint MOBI6+KF8 file Moon+ reads.** The loader is native and both halves carry
+  the same text; the styled rendering (centred headings and images, paragraph spacing) suggests KF8.
+  Settle it in ticket 07 by comparing a probe where the two halves' markup differs.
+
 ## Not surveyed yet
 
-- **MOBI6** (`TEST - Alices Adventures in Wonderland MOBI.mobi`, Global Grey edition, no KF8 section) and
-  **joint MOBI6+KF8** (`TEST - Alices Adventures in Wonderland AZW.azw`, Project Gutenberg #19033, `BOUNDARY`
-  record, KF8 from record 66): identified from their headers; Moon+ positions not captured yet. readsync:
-  Moon+ loads MOBI-family files through its EPUB code path (`Epub` over `MyZip_Mobi`), so the same `.po`
-  grammar and split rule apply, and for MOBI6 `chapter` is the ordinal in the file's compiled NCX (`INDX`).
-  KF8 is unconfirmed. [readsync]
 - **PDF** (`TEST - CS FOR DUMMIES.pdf`): page numbering base, reflow mode, end of book.

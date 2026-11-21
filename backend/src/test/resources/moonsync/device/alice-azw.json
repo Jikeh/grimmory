@@ -1,0 +1,180 @@
+{
+  "book": {
+    "moonFileName": "TEST - Alices Adventures in Wonderland AZW.azw",
+    "resource": "moonsync/books/alice-azw.azw",
+    "format": "MOBI6+KF8 (joint)",
+    "edition": "Lewis Carroll, Alice's Adventures in Wonderland (Sam'l Gabriel Sons 1916 'Storyland' edition) — Project Gutenberg #19033, 'Public domain in the USA.', licence included",
+    "structure": "Joint file: MOBI6 part (file version 6, 99,831 text bytes), then a BOUNDARY record and a KF8 part from record 66 (EXTH 121). The MOBI6 part's compiled NCX (INDX) has 14 entries; in record order fileposes 876, 1020, 1361, 2402, 11242, 19401, 30183, 39732, 48216, 55108, 60013, 68798, 73934, 1515 — the copyright entry (1515) is stored last but is a child of 'SAM'L GABRIEL SONS…' in the tree.",
+    "sha256": "2af93f62b49cc80a28f95e913638b331393af3434aa346dd47b68b2bcdec5b2f",
+    "size": 1150199
+  },
+  "moonVersion": "10.8",
+  "device": "Samsung Galaxy S25 (SM-S931B), Android 17, 1080x2340; Moon+ Reader Pro 10.8, automatic Drive sync",
+  "display": "The user's Moon+ settings (font serif 18.0, line spacing 3, left/right margins 10, top 20, bottom 16), portrait 1080x2340, Moon+'s light day theme.",
+  "notes": [
+    "Moon+'s chapter list is the NCX tree flattened in document order, with chapter 0 (front matter, listed under the book title) first: 0 title, 1 THE \"STORYLAND\" SERIES, 2 ALICE'S ADVENTURES IN WONDERLAND, 3 SAM'L GABRIEL SONS & COMPANY NEW YORK, 4 Copyright…, 5 I—DOWN THE RABBIT-HOLE … 14 X—ALICE'S EVIDENCE. So chapter I is 5. Indexing the MOBI6 NCX in record order would give 4 (the copyright entry is stored last), and readsync's fileposes[chapter] would give 3.",
+    "Which half Moon+ reads (MOBI6 or KF8) is unknown: Moon+'s MOBI loader is native (MLoader) and both halves carry the same text. The rendering is styled (centred heading and image, paragraph spacing). Against a naive tag-strip of the MOBI6 half from filepos 2402: Moon+ 2 / 24 / 616 vs naive 2 / 23 / 613 (the illustration before Z3 appears to count).",
+    "Chapter 0 opens with an image: its .po is 0@0#1, as in Pride and Prejudice.",
+    "The last chapter (X) runs to the end of the text, Gutenberg licence included: 15 pages, end of book at offset 21378."
+  ],
+  "captures": [
+    {
+      "id": "po-chapter0-start",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → first entry 'Alice's Adventures in Wonderland', close",
+        "page": "chapter 0 (cover image), 1/1",
+        "statusLine": [
+          "Alice's Adventures in Wonderland (1/1)",
+          "0.0%"
+        ]
+      },
+      "raw": "1738611943423*0@0#1:0.0%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 0,
+        "split": 0,
+        "offset": 1,
+        "percent": "0.0",
+        "scroll": null
+      }
+    },
+    {
+      "id": "po-chapter-i-start",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → 'I—DOWN THE RABBIT-HOLE', close",
+        "page": "chapter I page 1/4",
+        "statusLine": [
+          "I—DOWN THE RABBIT-HOLE (1/4)",
+          "2.4%"
+        ]
+      },
+      "raw": "1738611943423*5@0#0:2.4%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 5,
+        "split": 0,
+        "offset": 0,
+        "percent": "2.4",
+        "scroll": null
+      }
+    },
+    {
+      "id": "Z1",
+      "kind": "probe",
+      "text": "DOWN THE RABBIT-HOLE",
+      "screen": {
+        "from": [
+          250,
+          215
+        ],
+        "to": [
+          912,
+          215
+        ]
+      },
+      "context": {
+        "page": "po-chapter-i-start",
+        "note": "heading 'I—DOWN THE RABBIT-HOLE' at 0; the selection started after 'I—'"
+      },
+      "raw": "#\n194\nAlice's Adventures in Wonderland\n/sdcard/Books/MoonReader/TEST/TEST - Alices Adventures in Wonderland AZW.azw\n/sdcard/books/moonreader/test/test - alices adventures in wonderland azw.azw\n5\n0\n2\n20\n1996532479\n1795267139455\n\n\nDOWN THE RABBIT-HOLE\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 5,
+        "split": 0,
+        "position": 2,
+        "length": 20
+      },
+      "anHeader": [
+        "1150199",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Z2",
+      "kind": "probe",
+      "text": "Alice was beginning to get very tired of sitting by her sister",
+      "screen": {
+        "from": [
+          120,
+          300
+        ],
+        "to": [
+          1046,
+          300
+        ]
+      },
+      "context": {
+        "page": "po-chapter-i-start"
+      },
+      "raw": "#\n195\nAlice's Adventures in Wonderland\n/sdcard/Books/MoonReader/TEST/TEST - Alices Adventures in Wonderland AZW.azw\n/sdcard/books/moonreader/test/test - alices adventures in wonderland azw.azw\n5\n0\n24\n62\n1996532479\n1795267156882\n\n\nAlice was beginning to get very tired of sitting by her sister\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 5,
+        "split": 0,
+        "position": 24,
+        "length": 62
+      },
+      "anHeader": [
+        "1150199",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "Z3",
+      "kind": "probe",
+      "text": "There was nothing so very remarkable in that, nor did",
+      "screen": {
+        "from": [
+          120,
+          1234
+        ],
+        "to": [
+          989,
+          1234
+        ]
+      },
+      "context": {
+        "page": "po-chapter-i-start",
+        "note": "first line after the illustration"
+      },
+      "raw": "#\n196\nAlice's Adventures in Wonderland\n/sdcard/Books/MoonReader/TEST/TEST - Alices Adventures in Wonderland AZW.azw\n/sdcard/books/moonreader/test/test - alices adventures in wonderland azw.azw\n5\n0\n616\n53\n1996532479\n1795267176208\n\n\nThere was nothing so very remarkable in that, nor did\n0\n0\n0\n",
+      "parsed": {
+        "chapter": 5,
+        "split": 0,
+        "position": 616,
+        "length": 53
+      },
+      "anHeader": [
+        "1150199",
+        "indent:true",
+        "trim:true"
+      ]
+    },
+    {
+      "id": "po-end-of-book",
+      "kind": "po",
+      "context": {
+        "how": "chapter list → 'X—ALICE'S EVIDENCE', 20 page turns forward",
+        "page": "last page (Gutenberg licence)",
+        "statusLine": [
+          "X—ALICE'S EVIDENCE (15/15)",
+          "100%"
+        ]
+      },
+      "raw": "1738611943423*14@0#21378:100%",
+      "parsed": {
+        "format": "epub",
+        "deviceId": "1738611943423",
+        "chapter": 14,
+        "split": 0,
+        "offset": 21378,
+        "percent": "100",
+        "scroll": null
+      }
+    }
+  ]
+}
