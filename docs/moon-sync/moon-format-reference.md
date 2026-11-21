@@ -13,8 +13,7 @@ Every fact carries its source:
 - **[unknown]**: not settled; says what is missing.
 
 Fixtures: `ulysses.json`, `pride-and-prejudice.json`, `pinocchio.json` (EPUB), `alice-mobi.json` (MOBI6),
-`alice-azw.json` (MOBI6+KF8). PDF is
-**not surveyed yet** (see the end).
+`alice-azw.json` (MOBI6+KF8), `cs-for-dummies-pdf.json` (PDF).
 
 ## Files
 
@@ -33,7 +32,7 @@ changed; the `.po` only when the position changed, except on a forced "Sync to c
 | Format | Line | Source |
 |---|---|---|
 | EPUB (and every reflowable format) | `{device}*{chapter}@{split}#{offset}:{percent}%` | [device] all fixtures |
-| PDF | `{device}*{page}:{percent}%` | [readsync], [decompiled] `Sync`; not yet seen on device |
+| PDF | `{device}*{page}:{percent}%`, `page` 0-based | [device] cs-for-dummies-pdf |
 | optional suffix | `…%|{webViewScrollOffset}` | [readsync]; never seen on device |
 
 - `device` is a per-install random id; this phone always writes `1738611943423`. [device]
@@ -246,6 +245,16 @@ record 66, EXTH 121), from Project Gutenberg #19033. [file headers; fixtures `al
   the same text; the styled rendering (centred headings and images, paragraph spacing) suggests KF8.
   Settle it in ticket 07 by comparing a probe where the two halves' markup differs.
 
-## Not surveyed yet
+## PDF
 
-- **PDF** (`TEST - CS FOR DUMMIES.pdf`): page numbering base, reflow mode, end of book.
+Test file: `TEST - CS FOR DUMMIES.pdf` (338 pages, commercial, not committed). [fixture `cs-for-dummies-pdf.json`]
+
+- **`page` is 0-based**: displayed page 1 → `0`, 4 → `3`, 23 → `22`, the last page 338 → `337`. [device:
+  `po-page1`, `po-page4`, `po-page23`, `po-last-page`]
+- **`percent` = (page + 1) / pages, truncated to one decimal**, not rounded: 1/338 = 0.296 → `0.2%`,
+  4/338 = 1.18 → `1.1%`; the last page is `100%`. [device] Whether EPUB percent truncates too is [unknown].
+- **Text reflow doesn't change the format**: in reflow mode, page 24 was `…*23:7.1%`, with no in-page offset
+  and no `|scroll` suffix. Reflow only has a button once PDF Options → "Text Reflow button on top bar" is on.
+  [device: `po-reflow-page24`]
+- The reader's status line shows the outline title and `page/pages` (1-based). [device]
+- PDF highlights were not probed: Grimmory doesn't sync them (ticket 01 rejects PDF `.an`).

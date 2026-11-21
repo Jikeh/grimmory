@@ -590,7 +590,7 @@ def cmd_read_to(p: Phone, book: str, chapter: str, pages: str = "0") -> dict:
         time.sleep(0.8)
     p.step("read-to", 1)
     pos = status(p)
-    if pos.get("chapter") != chapter:
+    if (pos.get("chapter") or pos.get("status")) != chapter:  # PDF: the status line is the bare title
         raise DriverError(f"expected chapter {chapter!r}, the status line says {pos.get('status')!r}")
     return {"book": book, **pos}
 
