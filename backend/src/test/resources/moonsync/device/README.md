@@ -4,7 +4,8 @@ Positions and highlights captured from **Moon+ Reader Pro 10.8 on a real phone**
 `tools/moon-device/`). They are ground truth for the position tickets: a converter is right when it maps
 these Moon+ positions to the same text Moon+ showed.
 
-The format facts they prove are written up in `docs/moon-sync/moon-format-reference.md`.
+The format facts they prove are written up in
+[`docs/moon-sync/moon-format-reference.md`](../../../../../../docs/moon-sync/moon-format-reference.md).
 
 ## Files
 

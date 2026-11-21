@@ -62,6 +62,20 @@ section (`.scratch/moon-sync/spec.md`).
   Grimmory-side tickets.
 - Dialogs slide in. Tap only once a widget's bounds are stable (`Phone.tap_node` does this). Raw taps
   on remembered coordinates during an animation hit whatever is underneath.
+- **Capture `.po` with `close`, not `sync-up`.** Right after a chapter-list jump or a backward page turn,
+  "Sync to cloud" uploaded a stale position (the old chapter's start); closing uploaded the real one.
+- **Every long-press syncs.** The dictionary app that opens on a long-press pauses Moon+, which uploads
+  (the user sees sync toasts) and, on resume, downloads and imports the cloud `.an`. Expect intermediate
+  uploads between your own `close`s.
+- **Don't re-create a note where one was just deleted.** While the cloud `.an` still holds a `*DELETED*`
+  record for a (chapter, split, position), a new highlight there disappears on the next resume, and a
+  highlight at the same position as a bookmark wiped both. Reopen the book and make some other note change,
+  then `close`, so the cloud file drops the record; only then re-create it.
+- **Rotating the phone recreates the reader**, so in-reader commands refuse it (`require_reader`). After
+  checking on a capture that it is still the same test book, save the new instance with
+  `save_reader_state(book, Phone().reader_token())`, or `close` and `open` again.
+- **The status line's page numbers are estimates** across chunks of a split chapter and in merged
+  chapters; read positions from the `.po`.
 
 ## 5. Selecting text
 
@@ -70,6 +84,13 @@ section (`.scratch/moon-sync/spec.md`).
 - A long-press selects the word; the driver then drags the end handle (`dot2`) to (x2, y2). The end snaps
   to the **character boundary nearest x2**. Aim at the right edge of the last character's ink: its centre
   drops it, and the gap after it can pick up the next character (this happened with a closing quote).
+- Word boundaries: a long-press stops at a curly apostrophe ("I’m" → "m"), an em dash and a hyphen
+  ("To-morrow" → "morrow"). Start on a word without them, or accept the shorter text (the `.an` records
+  exactly what was selected).
+- Page turns tap the bottom-right strip below the text (`PAGE_TURN_TAP`), since a tap on the page's side
+  can land on a highlight and open its style bar. In landscape that point is off-screen: tap (2200, 1035).
+- To delete probes, `delete-listed <book> <text>` works from the Bookmarks panel without coordinates. When
+  it can't find an entry (a long list, entries off-screen), ask the user to delete it by hand: ⋮ → Delete.
 - A long-press also opens the user's dictionary app (a Moon+ setting; leave it). The driver closes it
   with Back and the selection survives.
 - To find coordinates for new text: take a `ui` capture, then measure glyph edges on a line from the PNG:
