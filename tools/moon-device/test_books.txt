@@ -2,7 +2,7 @@
 # One filename per line, exactly as on the phone and in Moon+'s Drive sync files (<filename>.po / .an).
 # Phone location: /storage/emulated/0/Books/MoonReader/TEST/
 # Local copies (not in the repo): C:\Users\Eddy\Downloads\moon-an-samples\
-TEST - Pride  Prejudice.epub
+TEST - Pride Prejudice.epub
 TEST - Le avventure di Pinocchio.epub
 TEST - Alices Adventures in Wonderland AZW.azw
 TEST - Alices Adventures in Wonderland MOBI.mobi

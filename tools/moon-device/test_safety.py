@@ -31,8 +31,8 @@ class TestBookGuard(unittest.TestCase):
                     self.assertIn("NotATestBook", result["error"])
 
     def test_allowlisted_names_must_match_exactly(self):
-        md.require_test_book("TEST - Pride  Prejudice.epub")
-        for near_miss in ("TEST - Pride Prejudice.epub", "test - pride  prejudice.epub", "", "TEST - "):
+        md.require_test_book("TEST - Pride Prejudice.epub")
+        for near_miss in ("TEST - Pride  Prejudice.epub", "test - pride prejudice.epub", "", "TEST - "):
             with self.subTest(name=near_miss), self.assertRaises(md.NotATestBook):
                 md.require_test_book(near_miss)
 

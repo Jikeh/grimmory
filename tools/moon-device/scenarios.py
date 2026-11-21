@@ -19,7 +19,7 @@ import moon_device as md
 # A selection starts at the word under (x1, y1) and ends at the character boundary nearest (x2, y2):
 # aim x2 at the right edge of the last character's ink (its centre drops it; the gap after it can
 # pick up the next character).
-BOOK = "TEST - Pride  Prejudice.epub"
+BOOK = "TEST - Pride Prejudice.epub"
 CHAPTER = "Chapter 2"
 LINE_A = (110, 618, 689, 618)    # line 8: 'I hope Mr. Bingley will like it, Lizzy.'  (Moon+ offset 396, length 39)
 LINE_A_TEXT = "I hope Mr. Bingley will like it, Lizzy."

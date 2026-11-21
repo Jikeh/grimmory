@@ -52,8 +52,10 @@ and signed in to Drive sync, and nobody using it: the driver taps on the screen.
 ## Safety: test books only
 
 On the phone, Moon+ uploads to its real Drive sync folder, so device runs only ever touch **test books**:
-the allowlist `test_books.txt` (all names start with `TEST - `; note the double space in
-`TEST - Pride  Prejudice.epub`). The driver refuses any book not on the list before connecting to the
+the allowlist `test_books.txt` (all names start with `TEST - `; the same names as the files in Grimmory's
+TEST library, see `tools/grimmory-api/README.md`). Pride and Prejudice was renamed from
+`TEST - Pride  Prejudice.epub` (double space) to `TEST - Pride Prejudice.epub` because Grimmory collapses
+repeated spaces in file names; the device fixtures and Drive files captured before that keep the old name. The driver refuses any book not on the list before connecting to the
 phone or Drive (`just device test` checks this offline). In-reader commands also refuse to act unless the
 reader in front is the one `open` started for that same book (the driver records the reader's activity
 instance in `captures/reader-state.json`), and `open` refuses to leave a reader it didn't open. The driver
@@ -123,7 +125,7 @@ Book text is drawn by Moon+'s own view (`MRTextView`), so words are not in the U
 screen coordinates on a fixed page. Menus, dialogs and buttons are normal widgets and are found by
 resource id or text.
 
-- **Book / page:** `TEST - Pride  Prejudice.epub`, **Chapter 2, page 1 of 3** (`read-to <book> "Chapter 2"`).
+- **Book / page:** `TEST - Pride Prejudice.epub`, **Chapter 2, page 1 of 3** (`read-to <book> "Chapter 2"`).
 - **Layout:** Moon+'s current font and size on the S25 (1080×2340), status line on. Line *n* of the page has
   its text centre at **y = 247 + 53·(n − 1)**.
 - **Calibrated selections** (in `scenarios.py`):

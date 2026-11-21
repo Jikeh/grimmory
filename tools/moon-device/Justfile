@@ -38,12 +38,12 @@ smoke:
 dump name='dump':
     uv run python moon_device.py dump "{{ name }}"
 
-# Run any driver command (JSON result; see README "Commands"), e.g. `just device run open 'TEST - Pride  Prejudice.epub'`.
+# Run any driver command (JSON result; see README "Commands"), e.g. `just device run open 'TEST - Pride Prejudice.epub'`.
 [positional-arguments]
 run command *args:
     uv run python moon_device.py "$@"
 
-# Read a test book's .po / .an from Moon+'s Drive sync folder (read-only), e.g. `just device fetch 'TEST - Pride  Prejudice.epub'`.
+# Read a test book's .po / .an from Moon+'s Drive sync folder (read-only), e.g. `just device fetch 'TEST - Pride Prejudice.epub'`.
 fetch book:
     uv run python moon_device.py fetch "{{ book }}"
 
