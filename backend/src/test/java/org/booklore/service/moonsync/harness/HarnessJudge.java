@@ -38,7 +38,7 @@ final class HarnessJudge {
             return new CaseResult(comparison.name(), id, input.spec(), reference, java, Status.EXEMPT, exemption.get(), Map.of(), List.of());
         }
         Map<String, String> ignored = new TreeMap<>(comparison.ignoredFields(input, reference, java));
-        List<JsonDiff.Difference> differences = JsonDiff.diff(comparison.comparable(reference), comparison.comparable(java), ignored.keySet());
+        List<JsonDiff.Difference> differences = JsonDiff.diff(comparison.normalized(reference), comparison.normalized(java), ignored.keySet());
         Status status = differences.isEmpty() ? Status.SAME : Status.DIFFERENT;
         return new CaseResult(comparison.name(), id, input.spec(), reference, java, status, null, ignored, differences);
     }

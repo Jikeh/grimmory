@@ -48,6 +48,11 @@ class Roots:
         return f"{root_name}/{path.relative_to(self.root(root_name)).as_posix()}"
 
 
+def error(exc: BaseException) -> dict[str, str]:
+    """A failed side, as both sides write it: ``{"error": "<message>"}`` (only its presence is compared)."""
+    return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 @dataclass(frozen=True)
 class Case:
     #: Stable, human-readable id: the input's file ref, plus ``#<capture id>`` for device-fixture captures.

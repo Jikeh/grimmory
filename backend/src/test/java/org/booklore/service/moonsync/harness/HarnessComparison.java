@@ -22,7 +22,7 @@ interface HarnessComparison {
     JsonNode run(HarnessInput input);
 
     /** Applied to both outputs before comparing; e.g. to reduce partial failures to a plain error. */
-    default JsonNode comparable(JsonNode output) {
+    default JsonNode normalized(JsonNode output) {
         return output;
     }
 

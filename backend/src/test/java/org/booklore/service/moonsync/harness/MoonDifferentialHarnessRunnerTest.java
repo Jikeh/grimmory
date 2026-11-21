@@ -88,6 +88,7 @@ class MoonDifferentialHarnessRunnerTest {
         MoonDifferentialHarness.Run run = MoonDifferentialHarness.run(harness, MoonDifferentialHarness.COMPARISONS);
         assertThat(run.missing()).isEmpty();
         assertThat(run.skipped()).containsExactly("an-roundtrip");
+        assertThat(run.empty()).as("a reference with no cases").containsExactly("po-roundtrip");
     }
 
     @Test

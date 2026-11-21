@@ -9,7 +9,7 @@ Per input (an ``.an`` file, or a device capture's decompressed text):
   own write (only when header and records parsed).
 
 Compared on decompressed text, never on zlib bytes. readsync has no note field (it folds the bookmark and note
-slots into ``text``); the Java side leaves ``text`` out of the comparison on records with a bookmark or note.
+slots into ``text``); the Java side compares its ``text`` folded the same way.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from readsync.connectors.gdrive_moon.an_parser import (
     serialize_an_epub,
 )
 
-from harness.inputs import Case, Roots, device_captures, files
+from harness.inputs import Case, Roots, device_captures, error, files
 
 NAME = "an-roundtrip"
 
@@ -56,7 +56,7 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
     try:
         text = zlib.decompress(raw).decode("utf-8")
     except Exception as exc:  # noqa: BLE001
-        return {"error": f"{type(exc).__name__}: {exc}"}
+        return error(exc)
     if "#A*#" in text:
         # readsync's parse_an dispatches this to its PDF parser; Grimmory rejects PDF .an files (spec deviation).
         return {"kind": "pdf"}
@@ -67,19 +67,19 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
         parsed_header = parse_an_epub_header(raw)
         header = {"totalLength": parsed_header.total_length, "indent": parsed_header.indent, "trim": parsed_header.trim}
     except Exception as exc:  # noqa: BLE001
-        parsed_header, header = None, {"error": f"{type(exc).__name__}: {exc}"}
+        parsed_header, header = None, error(exc)
     try:
         annotations = parse_an_epub(raw)
         records = [_record(a) for a in annotations]
     except Exception as exc:  # noqa: BLE001
-        annotations, records = None, {"error": f"{type(exc).__name__}: {exc}"}
+        annotations, records = None, error(exc)
 
     output: dict[str, Any] = {"kind": "epub", "header": header, "records": records}
     if parsed_header is not None and annotations is not None:
         try:
             output["reparsed"] = [_record(a) for a in parse_an_epub(serialize_an_epub(parsed_header, annotations))]
         except Exception as exc:  # noqa: BLE001
-            output["reparsed"] = {"error": f"{type(exc).__name__}: {exc}"}
+            output["reparsed"] = error(exc)
     return output
 
 

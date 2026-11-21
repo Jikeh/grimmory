@@ -78,7 +78,21 @@ class AnRoundTripComparisonTest {
         HarnessJudge.CaseResult result = HarnessJudge.judge(comparison, "step02", input, asReadsync(java));
 
         assertThat(result.status()).isEqualTo(HarnessJudge.Status.SAME);
-        assertThat(result.ignored()).containsKey("/records/" + noted + "/text").containsKey("/reparsed/0/note");
+        assertThat(result.ignored()).containsKey("/records/" + noted + "/note").doesNotContainKey("/records/" + noted + "/text");
+
+        // The highlighted text is still compared on the noted record, in readsync's folded form.
+        ObjectNode changed = (ObjectNode) asReadsync(java);
+        ((ObjectNode) changed.at("/records/" + noted)).put("text", "something else");
+        assertThat(HarnessJudge.judge(comparison, "step02", input, changed).differences())
+                .extracting(JsonDiff.Difference::path).containsExactly("/records/" + noted + "/text");
+    }
+
+    @Test
+    void foldsSlotsLikeParseAnEpub() {
+        assertThat(AnRoundTripComparison.readsyncText("", "note ", "text")).isEqualTo("note \ntext");
+        assertThat(AnRoundTripComparison.readsyncText("Mark ", "", "")).isEqualTo("Mark ");
+        assertThat(AnRoundTripComparison.readsyncText("", "", "Hello")).isEqualTo("Hello");
+        assertThat(AnRoundTripComparison.readsyncText("", "line one\nline two", "0")).isEqualTo("line one\nline two\n0");
     }
 
     @Test
@@ -99,6 +113,17 @@ class AnRoundTripComparisonTest {
         JsonNode java = comparison.run(input);
         assertThat(java).isEqualTo(JSON.readTree("{\"kind\":\"pdf\"}"));
         assertThat(comparison.exemption(input, java, java)).isPresent();
+    }
+
+    @Test
+    void pdfTagOffLineZeroIsExemptButARealPdfReadAsEpubIsNot() {
+        JsonNode readsyncPdf = JSON.readTree("{\"kind\":\"pdf\"}");
+        HarnessInput quoting = inline("1000\nindent:true\ntrim:true\n" + RECORD.replace("\nHello\n", "\nsee #A*# here\n"));
+        assertThat(comparison.exemption(quoting, readsyncPdf, comparison.run(quoting))).isPresent();
+
+        HarnessInput realPdf = inline("100#A*#1#A1#2\nindent:true\ntrim:true\n" + RECORD);
+        JsonNode javaReadAsEpub = JSON.readTree("{\"kind\":\"epub\",\"header\":null,\"records\":[]}");
+        assertThat(comparison.exemption(realPdf, readsyncPdf, javaReadAsEpub)).isEmpty();
     }
 
     @Test

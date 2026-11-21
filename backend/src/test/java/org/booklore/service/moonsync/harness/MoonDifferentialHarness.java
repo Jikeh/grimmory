@@ -45,15 +45,19 @@ final class MoonDifferentialHarness {
     static final String SELECTION_FILE = "selection.txt";
     private static final String MISSING = "missing reference output (registered on the Java side only?)";
     private static final String SKIPPED = "not run (left out with --only)";
+    private static final String EMPTY = "no cases (no matching inputs in the samples or corpus folder?)";
 
     /**
      * @param missing   comparisons without reference output that should have had one: a full reference run (no
      *                  {@value #SELECTION_FILE}) covers every comparison, so a missing one means the Java and Python
      *                  registries disagree. Fails the run like a difference.
      * @param skipped   comparisons left out on purpose ({@code reference --only})
+     * @param empty     comparisons with reference output but no cases (e.g. a samples folder override holding no
+     *                  matching files): a green run with nothing compared would be misleading, so this fails it
      * @param revisions readsync revision per comparison, as the reference image recorded it
      */
-    record Run(List<CaseResult> results, List<String> missing, List<String> skipped, Map<String, String> revisions) {
+    record Run(List<CaseResult> results, List<String> missing, List<String> skipped, List<String> empty,
+               Map<String, String> revisions) {
 
         List<CaseResult> differences() {
             return results.stream().filter(r -> r.status() == Status.DIFFERENT).toList();
@@ -100,6 +104,7 @@ final class MoonDifferentialHarness {
         List<CaseResult> results = new ArrayList<>();
         Map<String, String> revisions = new TreeMap<>();
         List<String> missing = new ArrayList<>(new TreeMap<>(comparisons).keySet());
+        List<String> empty = new ArrayList<>();
         for (Path file : jsonFiles(referenceDir)) {
             JsonNode document = read(file);
             String name = document.path("comparison").asString("");
@@ -112,6 +117,9 @@ final class MoonDifferentialHarness {
             }
             missing.remove(name);
             revisions.put(name, document.path("readsyncRevision").asString("unknown"));
+            if (document.path("cases").isEmpty()) {
+                empty.add(name);
+            }
             for (JsonNode c : document.path("cases")) {
                 results.add(HarnessJudge.judge(comparison, c.get("id").asString(), new HarnessInput(c.get("input"), files), c.get("output")));
             }
@@ -127,7 +135,7 @@ final class MoonDifferentialHarness {
                 throw new UncheckedIOException(e);
             }
         }
-        return new Run(results, missing, skipped, revisions);
+        return new Run(results, missing, skipped, empty, revisions);
     }
 
     // --- report ---
@@ -148,6 +156,7 @@ final class MoonDifferentialHarness {
                 name, c.total(), c.same(), c.exempt(), c.different())));
         run.missing().forEach(name -> out.append(name).append(": ").append(MISSING).append('\n'));
         run.skipped().forEach(name -> out.append(name).append(": ").append(SKIPPED).append('\n'));
+        run.empty().forEach(name -> out.append(name).append(": ").append(EMPTY).append('\n'));
         return out.toString();
     }
 
@@ -162,6 +171,9 @@ final class MoonDifferentialHarness {
     private static String markdown(Run run) {
         StringBuilder md = new StringBuilder("# Moon+ differential harness report\n\n");
         md.append(run.differences().isEmpty() ? "**No differences.**\n\n" : "**" + run.differences().size() + " differing case(s).**\n\n");
+        if (!run.empty().isEmpty()) {
+            md.append("**No cases for: ").append(String.join(", ", run.empty())).append(".**\n\n");
+        }
         if (!run.missing().isEmpty()) {
             md.append("**Missing reference output for: ").append(String.join(", ", run.missing())).append(".**\n\n");
         }
@@ -211,6 +223,7 @@ final class MoonDifferentialHarness {
         report.set("summary", JSON.valueToTree(counts(run)));
         report.set("missing", JSON.valueToTree(run.missing()));
         report.set("skipped", JSON.valueToTree(run.skipped()));
+        report.set("empty", JSON.valueToTree(run.empty()));
         ArrayNode cases = report.putArray("cases");
         run.results().stream().filter(r -> r.status() != Status.SAME).forEach(r -> cases.add(caseJson(r)));
         return report;

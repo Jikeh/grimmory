@@ -12,7 +12,7 @@ from typing import Any
 
 from readsync.connectors.gdrive_moon.po_parser import parse_po, serialize_po, with_percent
 
-from harness.inputs import Case, Roots, device_captures, files, read_text
+from harness.inputs import Case, Roots, device_captures, error, files, read_text
 
 NAME = "po-roundtrip"
 
@@ -33,7 +33,7 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
     try:
         record = parse_po(read_text(case_input, roots))
     except Exception as exc:  # noqa: BLE001 -- any failure is a parse error to compare
-        return {"error": f"{type(exc).__name__}: {exc}"}
+        return error(exc)
     return {
         "format": record.format,
         "deviceId": record.device_id,

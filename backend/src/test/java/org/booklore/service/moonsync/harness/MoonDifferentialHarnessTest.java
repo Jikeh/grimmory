@@ -34,6 +34,9 @@ class MoonDifferentialHarnessTest {
         assertThat(run.missing())
                 .as("comparisons with a Java side but no readsync output (register them in reference/harness/__init__.py)")
                 .isEmpty();
+        assertThat(run.empty())
+                .as("comparisons that compared nothing (check the samples and corpus folders)")
+                .isEmpty();
         assertThat(run.differences())
                 .as("differences from readsync (see tools/moon-harness/out/report.md):%n%s", summary)
                 .isEmpty();

@@ -47,7 +47,8 @@ captures (one highlight record, with the file's header recorded beside it) and `
 Other commands: `just harness selftest` (the fake client and the Node bridge against the corpus),
 `just harness test-reference` (the adapter's own pytest suite, in the reference image),
 `just harness reference --only <name>` (one comparison; the others show as "not run" in the report). In a full
-reference run, a comparison with a Java side but no readsync output (registered on one side only) fails the run.
+reference run, a comparison with a Java side but no readsync output (registered on one side only) fails the run,
+and so does a comparison with no cases (e.g. a samples override holding no matching files).
 
 ## Comparisons
 
@@ -64,9 +65,10 @@ Deliberate deviations (spec, "Where this deliberately differs from readsync") an
 device are never "fixed" to match readsync. The comparison declares them and the report counts them:
 
 - **Note text** (ticket 02): readsync has no bookmark or note field and folds both slots into `text`. Java's
-  `bookmark`/`note` are reported but not compared, and `text` is skipped on records where either is non-empty.
+  `bookmark`/`note` are reported but not compared on their own; Java's `text` is compared folded the same way
+  (`AnRoundTripComparison.readsyncText`), so the highlighted text is still checked on records with a note.
 - **PDF `.an` files**: Grimmory rejects them (readsync parses them); readsync also takes `#A*#` anywhere in the
-  file as PDF, Grimmory only on line 0. Whole case exempt.
+  file as PDF, Grimmory only on line 0 (exempt only when line 0 has no tag). Whole case exempt.
 - **Header-less `.an` files** (only deleted-notes records) and **lone `#` columns**: Grimmory parses them,
   readsync can't. Whole case exempt.
 - **Negative `.po` scroll suffix**: Grimmory accepts it, readsync takes digits only. Whole case exempt.
