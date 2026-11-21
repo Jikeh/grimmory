@@ -1,0 +1,5 @@
+# Local settings (instance URL, path to the credentials file)
+.env
+.venv/
+__pycache__/
+.cache/

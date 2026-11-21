@@ -20,3 +20,10 @@ Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/do
 
 To check Moon+ Reader behaviour on the user's phone, use the driver in `tools/moon-device/`: read its
 `PLAYBOOK.md` first (safety rules, working loop, known traps), then `README.md` for the commands.
+
+### The user's running Grimmory instance
+
+To look at real data or exercise the API of the user's own Grimmory (`http://grimmory.jikeh.lan`), use
+`tools/grimmory-api/` (read its `README.md`). It uses the user's own account: reads are unrestricted,
+writes are refused unless they target a book in the **TEST** library. The API spec is at `/api/openapi.json` on the
+instance (`grimmory_api.py endpoints <text>` searches a cached copy); public docs: https://grimmory.org/api/.

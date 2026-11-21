@@ -1,0 +1,19 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set working-directory := '.'
+
+# Install the Python dependencies with uv.
+setup:
+    uv sync
+
+# Log in and report the instance URL and book count.
+check:
+    uv run python grimmory_api.py check
+
+# Fetch the instance's OpenAPI spec into .cache/.
+openapi:
+    uv run python grimmory_api.py openapi
+
+# Run any command (JSON result; see README), e.g. `just grimmory run find "TEST - "` or `just grimmory run get /api/v1/books/84`.
+[positional-arguments]
+run command *args:
+    MSYS_NO_PATHCONV=1 uv run python grimmory_api.py "$@"
