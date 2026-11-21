@@ -19,17 +19,20 @@ from collections.abc import Iterator
 from typing import Any
 
 from readsync.connectors.gdrive_moon.an_parser import (
+    AnEpubHeader,
     EpubAnnotation,
     parse_an_epub,
     parse_an_epub_header,
     serialize_an_epub,
 )
 
-from harness.inputs import Case, Roots, device_captures, error, files
+from harness.inputs import Case, Roots, device_captures, error, files, read_bytes
 
 NAME = "an-roundtrip"
 KIND_EPUB = "epub"
 KIND_PDF = "pdf"
+#: readsync's ``parse_an`` takes a file holding this tag anywhere as the PDF sub-format.
+PDF_TAG = "#A*#"
 
 
 def cases(roots: Roots) -> Iterator[Case]:
@@ -48,9 +51,13 @@ def cases(roots: Roots) -> Iterator[Case]:
 
 
 def compressed_input(case_input: dict[str, Any], roots: Roots) -> bytes:
-    if "file" in case_input:
-        return roots.resolve(case_input["file"]).read_bytes()
-    return zlib.compress(str(case_input["text"]).encode("utf-8"))
+    """``.an`` files are zlib already; inline captures are decompressed text, compressed here for readsync."""
+    raw = read_bytes(case_input, roots)
+    return raw if "file" in case_input else zlib.compress(raw)
+
+
+def _header(header: AnEpubHeader) -> dict[str, Any]:
+    return {"totalLength": header.total_length, "indent": header.indent, "trim": header.trim}
 
 
 def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
@@ -59,15 +66,15 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
         text = zlib.decompress(raw).decode("utf-8")
     except Exception as exc:  # noqa: BLE001
         return error(exc)
-    if "#A*#" in text:
-        # readsync's parse_an dispatches this to its PDF parser; Grimmory rejects PDF .an files (spec deviation).
+    if PDF_TAG in text:
+        # Mirrors readsync's parse_an, which dispatches this to its PDF parser; Grimmory rejects PDF .an files (spec deviation).
         return {"kind": KIND_PDF}
 
     header: Any
     records: Any
     try:
         parsed_header = parse_an_epub_header(raw)
-        header = {"totalLength": parsed_header.total_length, "indent": parsed_header.indent, "trim": parsed_header.trim}
+        header = _header(parsed_header)
     except Exception as exc:  # noqa: BLE001
         parsed_header, header = None, error(exc)
     try:
@@ -81,8 +88,7 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
         try:
             written = serialize_an_epub(parsed_header, annotations)
             output["reparsed"] = [_record(a) for a in parse_an_epub(written)]
-            again = parse_an_epub_header(written)
-            output["reparsedHeader"] = {"totalLength": again.total_length, "indent": again.indent, "trim": again.trim}
+            output["reparsedHeader"] = _header(parse_an_epub_header(written))
         except Exception as exc:  # noqa: BLE001
             output["reparsed"] = error(exc)
     return output

@@ -135,6 +135,10 @@ class AnRoundTripComparisonTest {
         assertThat(comparison.exemption(input, JSON.readTree("{\"kind\":\"epub\",\"header\":{\"error\":\"x\"},\"records\":{\"error\":\"x\"}}"), java))
                 .isPresent();
         assertThat(comparison.exemption(input, java, java)).as("readsync parsed it, so compare").isEmpty();
+
+        HarnessInput live = inline(RECORD);
+        assertThat(comparison.exemption(live, JSON.readTree("{\"kind\":\"epub\",\"header\":{\"error\":\"x\"},\"records\":{\"error\":\"x\"}}"),
+                comparison.run(live))).as("header-less live highlights are not something Moon+ uploads").isEmpty();
     }
 
     @Test

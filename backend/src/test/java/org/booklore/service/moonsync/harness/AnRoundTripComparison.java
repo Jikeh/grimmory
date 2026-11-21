@@ -134,8 +134,10 @@ final class AnRoundTripComparison implements HarnessComparison {
             return Optional.empty();
         }
         boolean readsyncRejected = JsonDiff.isError(normalized(reference));
-        // Only when readsync failed too: a header Java dropped from a normal file must stay a difference.
-        if (javaKind.equals(KIND_EPUB) && java.path("header").isNull() && readsyncRejected) {
+        // Only when readsync failed too and every record is a deleted-notes record (the only header-less file Moon+
+        // uploads): a header Java dropped, or a header-less file of live highlights, must stay a difference.
+        boolean onlyDeleted = java.path("records").valueStream().allMatch(record -> record.path("deleted").asBoolean());
+        if (javaKind.equals(KIND_EPUB) && java.path("header").isNull() && readsyncRejected && onlyDeleted) {
             return Optional.of("header-less file (deleted-notes records only): Grimmory parses it, readsync can't (spec deviation)");
         }
         if (readsyncRejected && !JsonDiff.isError(java) && hasLoneHashColumn(java)) {
@@ -150,8 +152,9 @@ final class AnRoundTripComparison implements HarnessComparison {
         if (JsonDiff.isError(java.path("reparsed")) && hasMultiLineDeletedNote(java)) {
             // Moon+'s own unescaped multi-line deleted note doesn't fit the fixed slots; Grimmory only ever copies it
             // verbatim (MoonAnnotationFile class comment), so there is no Java layout to compare.
-            ignored.put("/reparsed", "Moon+'s multi-line deleted note: written verbatim only, never laid out");
-            ignored.put("/reparsedHeader", "Moon+'s multi-line deleted note: written verbatim only, never laid out");
+            String reason = "Moon+'s multi-line deleted note: written verbatim only, never laid out";
+            ignored.put("/reparsed", reason);
+            ignored.put("/reparsedHeader", reason);
         }
         for (String list : List.of("records", "reparsed")) {
             JsonNode records = java.path(list);

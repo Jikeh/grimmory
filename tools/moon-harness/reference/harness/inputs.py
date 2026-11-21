@@ -36,7 +36,7 @@ class Roots:
 
     def resolve(self, ref: str) -> Path:
         root_name, _, relative = ref.partition("/")
-        if root_name not in ("samples", "corpus") or not relative:
+        if not relative:
             raise ValueError(f"input file must be samples/<path> or corpus/<path>, got {ref!r}")
         root = self.root(root_name)
         path = (root / relative).resolve()
