@@ -55,7 +55,7 @@ and so does a comparison with no cases (e.g. a samples override holding no match
 | Name | readsync | Java | Compared |
 |---|---|---|---|
 | `po-roundtrip` | `po_parser.parse_po`, `serialize_po`, `with_percent` | `MoonPosition` | parsed fields; serialization of the parsed fields (percent re-formatted to one decimal); percent-only rewrites at fixed probe percents (rounding) |
-| `an-roundtrip` | `an_parser.parse_an_epub_header`, `parse_an_epub`, `serialize_an_epub` | `MoonAnnotationFile` | header; every record's fields; the records read back after each side's writer lays the whole file out afresh (Java: `MoonAnnotationFile.of`, Moon+'s 16-line layout) |
+| `an-roundtrip` | `an_parser.parse_an_epub_header`, `parse_an_epub`, `serialize_an_epub` | `MoonAnnotationFile` | header; every record's fields; the records and header read back after each side's writer lays the whole file out afresh (Java: `MoonAnnotationFile.of`, Moon+'s 16-line layout) |
 
 Tickets 04, 05, 06, 07 (foliate output), 08 (MOBI6 forward only), 13, 16, 19 and 20 each add one.
 

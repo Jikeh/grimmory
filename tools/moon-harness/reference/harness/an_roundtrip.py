@@ -5,8 +5,8 @@ Per input (an ``.an`` file, or a device capture's decompressed text):
 - ``kind``: ``"pdf"`` when readsync's dispatcher would take the PDF parser (``#A*#`` anywhere), else ``"epub"``;
 - ``header``: ``parse_an_epub_header`` (or ``{"error": ...}``);
 - ``records``: ``parse_an_epub``, one object per record (or ``{"error": ...}``);
-- ``reparsed``: the records read back from ``serialize_an_epub(header, records)``, i.e. what survives readsync's
-  own write (only when header and records parsed).
+- ``reparsed`` / ``reparsedHeader``: the records and header read back from ``serialize_an_epub(header, records)``,
+  i.e. what survives readsync's own write (only when header and records parsed).
 
 Compared on decompressed text, never on zlib bytes. readsync has no note field (it folds the bookmark and note
 slots into ``text``); the Java side compares its ``text`` folded the same way.
@@ -28,6 +28,8 @@ from readsync.connectors.gdrive_moon.an_parser import (
 from harness.inputs import Case, Roots, device_captures, error, files
 
 NAME = "an-roundtrip"
+KIND_EPUB = "epub"
+KIND_PDF = "pdf"
 
 
 def cases(roots: Roots) -> Iterator[Case]:
@@ -59,7 +61,7 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
         return error(exc)
     if "#A*#" in text:
         # readsync's parse_an dispatches this to its PDF parser; Grimmory rejects PDF .an files (spec deviation).
-        return {"kind": "pdf"}
+        return {"kind": KIND_PDF}
 
     header: Any
     records: Any
@@ -74,10 +76,13 @@ def run(case_input: dict[str, Any], roots: Roots) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         annotations, records = None, error(exc)
 
-    output: dict[str, Any] = {"kind": "epub", "header": header, "records": records}
+    output: dict[str, Any] = {"kind": KIND_EPUB, "header": header, "records": records}
     if parsed_header is not None and annotations is not None:
         try:
-            output["reparsed"] = [_record(a) for a in parse_an_epub(serialize_an_epub(parsed_header, annotations))]
+            written = serialize_an_epub(parsed_header, annotations)
+            output["reparsed"] = [_record(a) for a in parse_an_epub(written)]
+            again = parse_an_epub_header(written)
+            output["reparsedHeader"] = {"totalLength": again.total_length, "indent": again.indent, "trim": again.trim}
         except Exception as exc:  # noqa: BLE001
             output["reparsed"] = error(exc)
     return output

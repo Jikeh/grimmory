@@ -30,8 +30,11 @@ final class HarnessJudge {
         try {
             java = comparison.run(input);
         } catch (RuntimeException e) {
-            // run() should report failures itself; anything escaping is a harness bug, shown as a Java-side error.
+            // run() reports library failures itself; anything escaping is a harness bug (e.g. an unreadable input on
+            // the Java side). Always a difference, even where readsync failed too.
             java = JsonNodeFactory.instance.objectNode().put(JsonDiff.ERROR, "harness: " + e);
+            return new CaseResult(comparison.name(), id, input.spec(), reference, java, Status.DIFFERENT, null, Map.of(),
+                    List.of(new JsonDiff.Difference("", reference, java)));
         }
         Optional<String> exemption = comparison.exemption(input, reference, java);
         if (exemption.isPresent()) {

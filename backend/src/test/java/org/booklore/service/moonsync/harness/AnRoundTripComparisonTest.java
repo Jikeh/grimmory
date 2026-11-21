@@ -56,13 +56,14 @@ class AnRoundTripComparisonTest {
     @Test
     void readsJavaRecordsWithReadsyncsFieldNames() {
         JsonNode output = comparison.run(inline("1000\nindent:true\ntrim:false\n" + RECORD));
-        assertThat(output.get("kind").asString()).isEqualTo("epub");
+        assertThat(output.get("kind").asString()).isEqualTo(AnRoundTripComparison.KIND_EPUB);
         assertThat(output.get("header")).isEqualTo(JSON.readTree("{\"totalLength\":\"1000\",\"indent\":true,\"trim\":false}"));
         assertThat(JsonDiff.diff(output.get("records").get(0), JSON.readTree("""
                 {"id":"1","filename":"Book","path":"/p","lowerPath":"/p","chapter":3,"split":0,"offset":0,"length":5,
                  "color":-1,"time":2,"bookmark":"","note":"","text":"Hello","underline":"0","strikethrough":"0",
                  "bak":"0","deleted":false}"""), Set.of())).isEmpty();
         assertThat(output.get("reparsed")).isEqualTo(output.get("records"));
+        assertThat(output.get("reparsedHeader")).isEqualTo(output.get("header"));
     }
 
     @Test

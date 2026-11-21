@@ -5,6 +5,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.util.Set;
+import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +18,7 @@ class JsonDiffTest {
     }
 
     private static Set<String> paths(String reference, String java, String... ignored) {
-        Set<String> paths = new java.util.TreeSet<>();
+        Set<String> paths = new TreeSet<>();
         JsonDiff.diff(json(reference), json(java), Set.of(ignored)).forEach(d -> paths.add(d.path()));
         return paths;
     }

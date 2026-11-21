@@ -92,6 +92,13 @@ class MoonDifferentialHarnessRunnerTest {
     }
 
     @Test
+    void aJavaSideHarnessCrashIsADifferenceEvenWhenReadsyncFailedToo() throws IOException {
+        reference("po-roundtrip", "[{\"id\":\"gone\",\"input\":{\"file\":\"samples/missing.po\",\"percents\":[]},\"output\":{\"error\":\"x\"}}]");
+        MoonDifferentialHarness.Run run = MoonDifferentialHarness.run(harness, MoonDifferentialHarness.COMPARISONS);
+        assertThat(run.differences()).singleElement().satisfies(r -> assertThat(r.java().get("error").asString()).startsWith("harness: "));
+    }
+
+    @Test
     void readsyncOutputWithoutAJavaSideFails() throws IOException {
         reference("mystery", "[]");
         assertThatThrownBy(() -> MoonDifferentialHarness.run(harness, MoonDifferentialHarness.COMPARISONS))

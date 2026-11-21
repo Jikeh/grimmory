@@ -73,6 +73,7 @@ def test_an_probe_parses_through_readsync(roots: Roots) -> None:
     assert output["header"] == {"totalLength": "1000", "indent": True, "trim": True}
     assert output["records"][0]["text"] == "Hello"
     assert output["reparsed"] == output["records"]
+    assert output["reparsedHeader"] == output["header"]
 
 
 def test_an_pdf_and_header_less_inputs(roots: Roots) -> None:

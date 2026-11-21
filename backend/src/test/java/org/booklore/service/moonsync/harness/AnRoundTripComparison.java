@@ -1,6 +1,7 @@
 package org.booklore.service.moonsync.harness;
 
 import org.booklore.service.moonsync.position.format.MoonAnnotationFile;
+import org.booklore.service.moonsync.position.format.MoonAnnotationHeader;
 import org.booklore.service.moonsync.position.format.MoonAnnotationRecord;
 import org.booklore.service.moonsync.position.format.MoonFormatException;
 import tools.jackson.databind.JsonNode;
@@ -11,6 +12,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,7 +25,8 @@ import java.util.zip.InflaterInputStream;
  * Comparison {@code an-roundtrip}: {@link MoonAnnotationFile} against readsync's EPUB {@code an_parser}
  * ({@code parse_an_epub_header}, {@code parse_an_epub}, {@code serialize_an_epub}); reference side
  * {@code reference/harness/an_roundtrip.py}. Compared on decompressed text: header, every record's fields, and the
- * records read back after each side's writer lays the file out afresh ({@code reparsed}: readsync's
+ * records and header read back after each side's writer lays the file out afresh ({@code reparsed},
+ * {@code reparsedHeader}: readsync's
  * {@code serialize_an_epub}; Java's {@link MoonAnnotationFile#of}, Moon+'s 16-line layout for every record). Java's
  * verbatim rewrite of unchanged records is a Grimmory-only guarantee, covered by {@code MoonAnnotationFileTest}.
  *
@@ -65,15 +68,13 @@ final class AnRoundTripComparison implements HarnessComparison {
             return out.put(JsonDiff.ERROR, e.getMessage());
         }
         out.put("kind", KIND_EPUB);
-        file.header().ifPresentOrElse(
-                header -> out.putObject("header").put("totalLength", header.totalLength())
-                        .put("indent", header.indent()).put("trim", header.trim()),
-                () -> out.putNull("header"));
+        file.header().ifPresentOrElse(header -> out.set("header", header(header)), () -> out.putNull("header"));
         out.set("records", records(file.records()));
         if (file.header().isPresent()) {
             try {
-                MoonAnnotationFile laidOut = MoonAnnotationFile.of(file.header().get(), file.records());
-                out.set("reparsed", records(MoonAnnotationFile.parseText(laidOut.toText()).records()));
+                MoonAnnotationFile again = MoonAnnotationFile.parseText(MoonAnnotationFile.of(file.header().get(), file.records()).toText());
+                out.set("reparsed", records(again.records()));
+                again.header().ifPresentOrElse(header -> out.set("reparsedHeader", header(header)), () -> out.putNull("reparsedHeader"));
             } catch (RuntimeException e) {
                 out.putObject("reparsed").put(JsonDiff.ERROR, e.getMessage());
             }
@@ -150,6 +151,7 @@ final class AnRoundTripComparison implements HarnessComparison {
             // Moon+'s own unescaped multi-line deleted note doesn't fit the fixed slots; Grimmory only ever copies it
             // verbatim (MoonAnnotationFile class comment), so there is no Java layout to compare.
             ignored.put("/reparsed", "Moon+'s multi-line deleted note: written verbatim only, never laid out");
+            ignored.put("/reparsedHeader", "Moon+'s multi-line deleted note: written verbatim only, never laid out");
         }
         for (String list : List.of("records", "reparsed")) {
             JsonNode records = java.path(list);
@@ -165,13 +167,19 @@ final class AnRoundTripComparison implements HarnessComparison {
         return ignored;
     }
 
+    private static ObjectNode header(MoonAnnotationHeader header) {
+        return JsonNodeFactory.instance.objectNode().put("totalLength", header.totalLength())
+                .put("indent", header.indent()).put("trim", header.trim());
+    }
+
     private static String firstLine(HarnessInput input) {
         String text;
         if (input.isFile()) {
             try (InputStream in = new InflaterInputStream(new ByteArrayInputStream(input.bytes()))) {
                 text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             } catch (IOException e) {
-                return "";
+                // Unreachable after Java parsed the file; never let it widen the exemption.
+                throw new UncheckedIOException(e);
             }
         } else {
             text = input.text();
