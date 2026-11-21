@@ -136,7 +136,8 @@ final class AnRoundTripComparison implements HarnessComparison {
         boolean readsyncRejected = JsonDiff.isError(normalized(reference));
         // Only when readsync failed too and every record is a deleted-notes record (the only header-less file Moon+
         // uploads): a header Java dropped, or a header-less file of live highlights, must stay a difference.
-        boolean onlyDeleted = java.path("records").valueStream().allMatch(record -> record.path("deleted").asBoolean());
+        JsonNode records = java.path("records");
+        boolean onlyDeleted = !records.isEmpty() && records.valueStream().allMatch(record -> record.path("deleted").asBoolean());
         if (javaKind.equals(KIND_EPUB) && java.path("header").isNull() && readsyncRejected && onlyDeleted) {
             return Optional.of("header-less file (deleted-notes records only): Grimmory parses it, readsync can't (spec deviation)");
         }
@@ -175,6 +176,7 @@ final class AnRoundTripComparison implements HarnessComparison {
                 .put("indent", header.indent()).put("trim", header.trim());
     }
 
+    /** Decompresses on its own rather than through MoonAnnotationFile, so the exemption doesn't trust the code under test. */
     private static String firstLine(HarnessInput input) {
         String text;
         if (input.isFile()) {
