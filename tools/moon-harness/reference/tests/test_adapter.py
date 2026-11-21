@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+import zipfile
 import zlib
 from pathlib import Path
 
 import httpx
 import pytest
 
-from harness import COMPARISONS, an_roundtrip, po_roundtrip
+from harness import COMPARISONS, an_roundtrip, epub_books, epub_chapter_map, epub_parser_parity, epub_structure, po_roundtrip
 from harness.__main__ import write_reference
 from harness.fake_grimmory import FakeGrimmoryClient
 from harness.inputs import Roots
@@ -149,3 +150,72 @@ async def test_bridge_answers_through_readsync_env(tmp_path: Path) -> None:
     finally:
         await env.aclose()
     assert len(split_map["chunks"]) == 1
+
+
+IN_IMAGE = pytest.mark.skipif(not Path("/app/src/readsync").is_dir(), reason="needs the reference image (Node bridge)")
+
+_OPF = """<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata/>
+  <manifest>
+    <item id="a" href="a.xhtml" media-type="application/xhtml+xml"/>
+    <item id="b" href="b%20c.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+  </manifest>
+  <spine toc="ncx"><itemref idref="a"/><itemref idref="b"/></spine>
+</package>
+"""
+_NCX = """<?xml version="1.0"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint playOrder="1"><content src="a.xhtml"/></navPoint>
+  <navPoint playOrder="7"><content src="a.xhtml#two"/></navPoint>
+  <navPoint><content src="b%20c.xhtml"/></navPoint>
+</navMap></ncx>
+"""
+
+
+@pytest.fixture
+def epub_roots(tmp_path: Path) -> Roots:
+    samples, corpus = tmp_path / "samples", tmp_path / "corpus"
+    samples.mkdir()
+    corpus.mkdir()
+    with zipfile.ZipFile(corpus / "Small.epub", "w") as zf:
+        zf.writestr("META-INF/container.xml", '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+                    '<rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>')
+        zf.writestr("OEBPS/content.opf", _OPF)
+        zf.writestr("OEBPS/toc.ncx", _NCX)
+        zf.writestr("OEBPS/a.xhtml", '<html><body><p>one</p><h2 id="two">two</h2></body></html>')
+        zf.writestr("OEBPS/b%20c.xhtml", "<html>\r\n<body><p>three</p></body></html>")
+    (corpus / "Broken.epub").write_bytes(b"not a zip")
+    return Roots(samples=samples, corpus=corpus)
+
+
+def test_epub_cases_are_corpus_books(epub_roots: Roots) -> None:
+    for module in (epub_structure, epub_parser_parity, epub_chapter_map):
+        assert [c.id for c in module.cases(epub_roots)] == ["corpus/Broken.epub", "corpus/Small.epub"]
+    with pytest.raises(ValueError):
+        epub_books.book_id({"file": "samples/x.epub"})
+
+
+@IN_IMAGE
+def test_epub_structure_through_readsync(epub_roots: Roots) -> None:
+    output = epub_structure.run({"file": "corpus/Small.epub"}, epub_roots)
+    assert output["spineHrefs"] == ["a.xhtml", "b%20c.xhtml"]
+    assert output["spinePaths"] == ["OEBPS/a.xhtml", "OEBPS/b%20c.xhtml"]
+    assert output["ncxTrusted"] is True
+    assert [n["playOrder"] for n in output["navPoints"]] == [1, 7, None]
+    assert output["navPointSpineIndex"] == [0, 0, 1]
+    assert "error" in epub_structure.run({"file": "corpus/Broken.epub"}, epub_roots)
+
+
+@IN_IMAGE
+def test_epub_parser_parity_signs_every_spine_file(epub_roots: Roots) -> None:
+    files = epub_parser_parity.run({"file": "corpus/Small.epub"}, epub_roots)["files"]
+    assert [f["textLength"] for f in files] == [len("onetwo"), len("three")]
+    assert all(len(f["digest"]) == 64 for f in files)
+
+
+@IN_IMAGE
+def test_epub_chapter_map_resolves_both_ways(epub_roots: Roots) -> None:
+    output = epub_chapter_map.run({"file": "corpus/Small.epub"}, epub_roots)
+    assert [c["relaxed"] for c in output["chapters"]] == [[0, 0], [0, 3], [1, 0], None, None]
+    assert {"spine": 0, "offset": 4, "result": [1, 3]} in output["reverse"]

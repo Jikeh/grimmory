@@ -39,7 +39,8 @@ final class MoonDifferentialHarness {
     static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
     /** Every comparison, by name. Adding one: implement {@link HarnessComparison} and list it here (README). */
-    static final Map<String, HarnessComparison> COMPARISONS = registry(new PoRoundTripComparison(), new AnRoundTripComparison());
+    static final Map<String, HarnessComparison> COMPARISONS = registry(new PoRoundTripComparison(), new AnRoundTripComparison(),
+            new EpubStructureComparison(), new EpubParserParityComparison(), new EpubChapterMapComparison());
 
     /** Written by the reference side beside its outputs when only some comparisons were asked for. */
     static final String SELECTION_FILE = "selection.txt";

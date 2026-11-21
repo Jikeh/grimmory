@@ -48,7 +48,7 @@ class MoonDifferentialHarnessRunnerTest {
             assertThat(r.id()).isEqualTo("samples/format/a.po");
             assertThat(r.differences()).extracting(JsonDiff.Difference::path).containsExactly("/offset");
         });
-        assertThat(run.missing()).containsExactly("an-roundtrip");
+        assertThat(run.missing()).containsExactly("an-roundtrip", "epub-chapter-map", "epub-parser-parity", "epub-structure");
         assertThat(MoonDifferentialHarness.summary(run)).contains("po-roundtrip: 2 cases, 1 same, 0 exempt, 1 different")
                 .contains("an-roundtrip: missing reference output");
 
@@ -87,7 +87,7 @@ class MoonDifferentialHarnessRunnerTest {
         Files.writeString(harness.resolve("out/reference/" + MoonDifferentialHarness.SELECTION_FILE), "po-roundtrip\n");
         MoonDifferentialHarness.Run run = MoonDifferentialHarness.run(harness, MoonDifferentialHarness.COMPARISONS);
         assertThat(run.missing()).isEmpty();
-        assertThat(run.skipped()).containsExactly("an-roundtrip");
+        assertThat(run.skipped()).containsExactly("an-roundtrip", "epub-chapter-map", "epub-parser-parity", "epub-structure");
         assertThat(run.empty()).as("a reference with no cases").containsExactly("po-roundtrip");
     }
 

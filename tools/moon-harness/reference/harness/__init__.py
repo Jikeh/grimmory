@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from types import ModuleType
 
-from harness import an_roundtrip, po_roundtrip
+from harness import an_roundtrip, epub_chapter_map, epub_parser_parity, epub_structure, po_roundtrip
 
 #: Every comparison, in report order. Adding one: write the module and list it here (README, "Adding a comparison").
-COMPARISONS: dict[str, ModuleType] = {module.NAME: module for module in (po_roundtrip, an_roundtrip)}
+COMPARISONS: dict[str, ModuleType] = {module.NAME: module for module in (
+    po_roundtrip, an_roundtrip, epub_structure, epub_parser_parity, epub_chapter_map,
+)}

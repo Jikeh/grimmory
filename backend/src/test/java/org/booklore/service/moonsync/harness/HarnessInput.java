@@ -24,10 +24,15 @@ record HarnessInput(JsonNode spec, Function<String, Path> files) {
         return spec.has("file");
     }
 
+    /** The local path of a {@code "file"} input. */
+    Path path() {
+        return files.apply(spec.get("file").asString());
+    }
+
     byte[] bytes() {
         if (isFile()) {
             try {
-                return Files.readAllBytes(files.apply(spec.get("file").asString()));
+                return Files.readAllBytes(path());
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

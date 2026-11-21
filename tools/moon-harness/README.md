@@ -36,11 +36,17 @@ equal whatever their messages say. `.an` content is compared as decompressed tex
 |---|---|---|---|
 | readsync source tree | build context | `../readsync` next to this repo | `MOON_HARNESS_READSYNC` |
 | samples (`.po`, `.an`, device fixtures) | `/samples` (read-only) | `backend/src/test/resources/moonsync` | `MOON_HARNESS_SAMPLES` |
-| corpus (EPUB/MOBI/PDF books) | `/corpus` (read-only) | `backend/src/test/resources/moonsync/books` | `MOON_HARNESS_CORPUS` |
+| corpus (EPUB/MOBI/PDF books) | `/corpus` (read-only) | `backend/src/test/resources/moonsync/books` (Ulysses, Alice AZW, `edge-cases.epub`) | `MOON_HARNESS_CORPUS` |
 | output | `/out` | `tools/moon-harness/out` (git-ignored) | `MOON_HARNESS_OUT` |
 
 Point the corpus at your library (or a subset folder) for a full run, e.g.
-`MOON_HARNESS_CORPUS=/path/to/books just harness run`. Samples are every `*.po` and `*.an` file under the
+`MOON_HARNESS_CORPUS=/path/to/books just harness run`. `edge-cases.epub` is synthetic (original content, built by
+`edge-cases/make_epub.py`): one spine file per family of HTML constructs where jsoup and parse5 are most likely to
+build different trees (self-closing non-void tags, implied and misnested tags, tables, raw-text elements, SVG/MathML
+and CDATA, entities, a BOM and text after `</body>`, a file without `<html>`, CRLF), plus the NCX shapes the chapter
+map has to survive (nested navPoints, percent-encoded and non-ASCII hrefs, a missing file, an unresolvable anchor, a
+missing or non-numeric `playOrder`, several chapters in one file, a file Moon+ splits). Rebuild it with
+`python tools/moon-harness/edge-cases/make_epub.py` (deterministic). Samples are every `*.po` and `*.an` file under the
 samples folder plus the captures in device fixtures (`device/*.json`, ticket 00b): `po` captures, `probe`
 captures (one highlight record, with the file's header recorded beside it) and `deleted` captures.
 
@@ -56,8 +62,17 @@ and so does a comparison with no cases (e.g. a samples override holding no match
 |---|---|---|---|
 | `po-roundtrip` | `po_parser.parse_po`, `serialize_po`, `with_percent` | `MoonPosition` | parsed fields; serialization of the parsed fields (percent re-formatted to one decimal); percent-only rewrites at fixed probe percents (rounding) |
 | `an-roundtrip` | `an_parser.parse_an_epub_header`, `parse_an_epub`, `serialize_an_epub` | `MoonAnnotationFile` | header; every record's fields; the records and header read back after each side's writer lays the whole file out afresh (Java: `MoonAnnotationFile.of`, Moon+'s 16-line layout) |
+| `epub-structure` | `EpubContentCache` | `EpubPackage` | per corpus EPUB: spine hrefs and paths, which spine items are readable, NCX navPoints (`playOrder`, href, fragment), the trust gate, each navPoint's spine index |
+| `epub-parser-parity` | `new JSDOM(html)` (the bridge's parser) and `walk.js`, via `reference/harness/tree_signature.js` | `MoonHtml` (jsoup, normalized) and `ChapterText` | per spine file: a digest of the element and text-node sequence (`tree_signature.js` defines it), element and text-node counts, the walk's text length and digest |
+| `epub-chapter-map` | `EpubNcxCache` | `MoonChapterMap` | every chapter index, with and without the single-chunk guard; reverse lookups at 0 and around each anchor |
 
-Tickets 04, 05, 06, 07 (foliate output), 08 (MOBI6 forward only), 13, 16, 19 and 20 each add one.
+Tickets 05, 06, 07 (foliate output), 08 (MOBI6 forward only), 13, 16, 19 and 20 each add one.
+
+**Diagnosing a parser-parity difference**: the digest only says *that* the trees differ. Print both event sequences
+for the spine file and diff them: on the Java side `EpubParserParityComparison.events(MoonHtml.parse(html))`, on the
+reference side `tree_signature.js` with `TREE_EVENTS=1` (plain `node`, `READSYNC_CFI_BRIDGE` pointing at readsync's
+`cfi_bridge` folder, a JSON array of HTML strings on stdin). Fix the difference in `MoonHtml` (each normalization there names the WHATWG rule
+jsoup departs from), add the construct to `edge-cases/make_epub.py`, and pin it in `MoonHtmlTest`.
 
 ## Known differences (exempt from parity)
 

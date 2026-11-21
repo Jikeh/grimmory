@@ -34,8 +34,14 @@ test-class test_class:
 test-docker filter='':
     docker compose -f ../dev.docker-compose.yml run --rm --no-deps -T backend sh -c 'cd /backend && ./gradlew test --no-daemon --build-cache {{ if filter == "" { "" } else { "--tests \"" + filter + "\"" } }}'
 
-# Run the Moon+ sync position conversion library tests (.po/.an formats and later position math) in Docker.
-test-moon-position: (test-docker 'org.booklore.service.moonsync.position.*')
+# Run the Moon+ sync position conversion library tests in Docker. Books that can't be committed are mounted read-only when found: MOON_LOCAL_BOOKS (the device test books, any file names) and MOON_READSYNC_FIXTURES (readsync's tests/fixtures/grimmory, default: the readsync checkout next to this repo). Tests needing an absent book are reported as skipped.
+test-moon-position:
+    abs() { (cd "$1" && (pwd -W 2>/dev/null || pwd)); }; args=(); \
+    fixtures="${MOON_READSYNC_FIXTURES:-{{ source_directory() }}/../../readsync/tests/fixtures/grimmory}"; \
+    if [[ -d "$fixtures" ]]; then args+=(-v "$(abs "$fixtures"):/moon-readsync-fixtures:ro" -e MOON_READSYNC_FIXTURES=/moon-readsync-fixtures); fi; \
+    if [[ -n "${MOON_LOCAL_BOOKS:-}" ]]; then args+=(-v "$(abs "$MOON_LOCAL_BOOKS"):/moon-local-books:ro" -e MOON_LOCAL_BOOKS=/moon-local-books); fi; \
+    MSYS_NO_PATHCONV=1 docker compose -f ../dev.docker-compose.yml run --rm --no-deps -T "${args[@]}" backend \
+      sh -c 'cd /backend && ./gradlew test --no-daemon --build-cache --tests "org.booklore.service.moonsync.position.*"'
 
 # Run tests and generate JaCoCo coverage output.
 coverage:

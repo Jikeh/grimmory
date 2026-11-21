@@ -61,10 +61,35 @@ changed; the `.po` only when the position changed, except on a forced "Sync to c
   "Indice", points at spine item 3, so chapter 40 is `indice.xhtml` + `pre.xhtml` + every chapter again +
   `diz.xhtml` + `titoli_collana.xhtml`: ~130 pages, status line 99.2% on its page 4. Files with no navPoint
   (`pre.xhtml`) are only reachable inside it. [device: pinocchio `po-indice-p4`, `Pi7`, `po-end-of-book`]
-  - [unknown] The exact rule for which files belong to which chapter when NCX and spine disagree. "Frontespizio"
-    stopped before `indice.xhtml` even though the next navPoint in the NCX is in a later file. Also, that merged
-    chapter's last chunk holds ~1,900 more characters than a plain concatenation of the files' text predicts.
-    Settle it in ticket 04 from `Epub.getChapters` / `recheckChapters`.
+- **What a chapter contains** [decompiled `Epub.getChaptersFromOpf`, `checkChapterAdditionalText`,
+  `getChapterTextWithIDTag`, `getMoreContentFromNextID_Tag`, `recheckChapters`; device: pride, pinocchio]. Ported
+  in `MoonChapterAssembly` (ticket 04); each piece of a chapter's HTML is traced back to its spine file:
+  - Each file contributes its `<body>` content (`T.getHtmlBody`).
+  - A chapter with a `#fragment` starts at the tag holding that id (found by string search for `id="…"`,
+    `name="…"`, then bare quotes) and steps back over opening tags directly before it; it ends at the next chapter's
+    id tag when that chapter is in the same file. A fragment within the first 500 characters of the body (or 100 and
+    a quarter of it) of a file the previous chapter isn't in is ignored: the chapter starts at the body start.
+  - Spine files between a chapter's file and the next chapter's (or an earlier-in-the-spine later chapter's: that is
+    why Pinocchio's "Frontespizio" stops before `indice.xhtml`) are appended to it, each after `<a name=FILE>` and the
+    page break `<hr2>`. With at most two files between, only files no chapter claims are appended; with more, every
+    one of them is, already-used chapters included. That is the repeat in Pinocchio's chapter 40: `indice.xhtml` then
+    every file to the spine end.
+  - Unclaimed files before the first chapter's file are chapter 0; so is the body before the first chapter's
+    anchor when longer than 100 characters (P&P: title page, `<hr2>`, the table of contents). The head of a file
+    before a later chapter's anchor goes to the chapter before it when long enough.
+  - An ID-addressed chapter has its HTML comments removed (`ifContentEmpty`), and becomes `<center><h2>title</h2>`
+    when nothing is left.
+  - `<hr2>` adds no character itself: it is a paragraph break plus a zero-width page-break span
+    (`HtmlToSpannedConverter`).
+  - [unknown] Pinocchio's chapter 40, chunk 2: the device's end-of-book offset (65,889, at the last page's start)
+    is ~1,300 characters past what readsync's renderer counts for that chunk of the assembled chapter (64,575; a
+    plain concatenation without Moon+'s markers gave 64,059). The markers shift the chunk cuts and explain ~500 of the
+    original ~1,900-character gap; the rest isn't in the assembly (the chunk boundaries and the file list match the
+    decompiled rules and the device's 3 chunks). Left for ticket 05's renderer (suspects: the glossary's table and the
+    many `&nbsp;` paragraphs).
+  - Not ported (reported as unsupported, never guessed): books Moon+ reads through an EPUB 3 nav document, a
+    one-navPoint NCX over at most two spine files, and chapters whose Moon+ number differs from readsync's (front
+    matter one side counts and the other doesn't, a navPoint Moon+ drops).
 
 ### `split`: chunk of an oversized chapter
 
@@ -225,6 +250,9 @@ The export also keeps only notes that match Moon+'s current annotation list by (
 
 - **Reading order and chapter contents when the NCX disagrees with the spine** (Pinocchio) aren't in readsync's
   notes: chapter index and reading order follow the NCX, and the last navPoint's chapter runs to the spine end.
+- **A chapter's text spans files**: readsync measures an offset inside the chapter's first file and clamps it to
+  that file's end; Moon+ assembles the chapter from several files (see "What a chapter contains"), so Pinocchio's
+  `Pi7` (40@0#5578, three files into chapter 40) can't be reached the readsync way.
 - **Chapter 0 can span two files** and stops at a mid-file anchor (Pride and Prejudice). readsync has "content
   before the first navPoint is chapter 0"; this adds that it crosses files and that the anchor splits a file.
 - **The `.po` offset isn't always the page's first character** (line spacing 12). readsync treats it as the
