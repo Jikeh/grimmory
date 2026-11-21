@@ -515,7 +515,7 @@ class MoonAnnotationFileTest {
 
         @Test
         void refusesToWriteAFieldThatWouldBreakTheLineStructure() {
-            MoonAnnotationRecord broken = highlight("1", 0, 0, 0, "text").withNote("two\nlines");
+            MoonAnnotationRecord broken = highlight("1", 0, 0, 0, "text").withRawNote("two\nlines");
 
             assertThatThrownBy(() -> MoonAnnotationFile.of(new MoonAnnotationHeader("1", true, true), List.of(broken)).toText())
                     .isInstanceOf(IllegalArgumentException.class)

@@ -16,7 +16,7 @@ import java.util.Objects;
  *  5 chapter       NCX-derived chapter index
  *  6 split         split chunk within the chapter
  *  7 offset        start offset into the chunk's rendered text
- *  8 length        highlighted length; on bookmark rows, the bookmark's colour
+ *  8 length        highlighted length; on bookmark rows, the bookmark's colour (BookDb.bookmarkToNote; 0 on the device)
  *  9 color         packed ARGB highlight colour
  * 10 time          created, epoch millis
  * 11 bookmark      bookmark name; non-empty only on bookmark rows
@@ -121,7 +121,7 @@ public record MoonAnnotationRecord(
     }
 
     /** This record with its raw note slot set as stored, without encoding (see {@link #withNoteText}). */
-    public MoonAnnotationRecord withNote(String newNote) {
+    public MoonAnnotationRecord withRawNote(String newNote) {
         return new MoonAnnotationRecord(id, filename, path, lowerPath, chapter, split, offset, length, color, time,
                 bookmark, newNote, text, underline, strikethrough, bak);
     }
@@ -142,7 +142,7 @@ public record MoonAnnotationRecord(
      * equals the parsed one, so a rewrite lays it out afresh instead of copying Moon+'s lines verbatim.
      */
     public MoonAnnotationRecord withNoteText(String newNoteText) {
-        return withNote(encodeLineBreaks(Objects.requireNonNull(newNoteText, "newNoteText")));
+        return withRawNote(encodeLineBreaks(Objects.requireNonNull(newNoteText, "newNoteText")));
     }
 
     private static String decodeLineBreaks(String stored) {
