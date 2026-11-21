@@ -12,7 +12,7 @@ import java.util.Optional;
 /**
  * Comparison {@code po-roundtrip}: {@link MoonPosition} against readsync's {@code po_parser}
  * ({@code parse_po}, {@code serialize_po}, {@code with_percent}); reference side
- * {@code reference/adapter/po_roundtrip.py}.
+ * {@code reference/harness/po_roundtrip.py}.
  *
  * <p>{@code serialized} is readsync's serialization of the parsed fields, which re-formats the percent with one
  * decimal; the Java equivalent is {@code withPercent(percent())}, not {@link MoonPosition#serialize()} (that one
@@ -32,7 +32,7 @@ final class PoRoundTripComparison implements HarnessComparison {
         try {
             position = MoonPosition.parse(input.text());
         } catch (MoonFormatException e) {
-            return out.put("error", e.getMessage());
+            return out.put(JsonDiff.ERROR, e.getMessage());
         }
         switch (position) {
             case MoonPosition.Epub epub -> out.put("format", "epub").put("deviceId", epub.deviceId())
@@ -54,7 +54,7 @@ final class PoRoundTripComparison implements HarnessComparison {
 
     @Override
     public Optional<String> exemption(HarnessInput input, JsonNode reference, JsonNode java) {
-        if (reference.has("error") && java.path("scroll").asString("").startsWith("-")) {
+        if (JsonDiff.isError(reference) && java.path("scroll").asString("").startsWith("-")) {
             return Optional.of("negative WebView scroll suffix: Grimmory accepts it, readsync takes digits only (spec deviation)");
         }
         return Optional.empty();

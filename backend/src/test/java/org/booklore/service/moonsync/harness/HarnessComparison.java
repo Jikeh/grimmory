@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * The Java side of one differential comparison. The reference side is the Python module with the same
- * {@link #name()} in {@code tools/moon-harness/reference/adapter/}; both turn the same input into JSON of the same
+ * {@link #name()} in {@code tools/moon-harness/reference/harness/}; both turn the same input into JSON of the same
  * shape, and {@link HarnessJudge} compares them.
  *
  * <p>Known, documented differences from readsync (the spec's "Where this deliberately differs from readsync", and

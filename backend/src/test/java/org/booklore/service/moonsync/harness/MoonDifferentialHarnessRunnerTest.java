@@ -50,7 +50,7 @@ class MoonDifferentialHarnessRunnerTest {
         });
         assertThat(run.missing()).containsExactly("an-roundtrip");
         assertThat(MoonDifferentialHarness.summary(run)).contains("po-roundtrip: 2 cases, 1 same, 0 exempt, 1 different")
-                .contains("an-roundtrip: MISSING");
+                .contains("an-roundtrip: missing reference output");
 
         MoonDifferentialHarness.writeReport(run, harness.resolve("out"));
         String report = Files.readString(harness.resolve("out/report.md"));

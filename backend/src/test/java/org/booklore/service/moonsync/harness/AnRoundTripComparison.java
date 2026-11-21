@@ -16,8 +16,10 @@ import java.util.Optional;
 /**
  * Comparison {@code an-roundtrip}: {@link MoonAnnotationFile} against readsync's EPUB {@code an_parser}
  * ({@code parse_an_epub_header}, {@code parse_an_epub}, {@code serialize_an_epub}); reference side
- * {@code reference/adapter/an_roundtrip.py}. Compared on decompressed text: header, every record's fields, and the
- * records read back after each side writes the unchanged file.
+ * {@code reference/harness/an_roundtrip.py}. Compared on decompressed text: header, every record's fields, and the
+ * records read back after each side's writer lays the file out afresh ({@code reparsed}: readsync's
+ * {@code serialize_an_epub}; Java's {@link MoonAnnotationFile#of}, Moon+'s 16-line layout for every record). Java's
+ * verbatim rewrite of unchanged records is a Grimmory-only guarantee, covered by {@code MoonAnnotationFileTest}.
  *
  * <p>Known differences, never compared (spec "Where this deliberately differs from readsync"; ticket 02):
  * <ul>
@@ -48,7 +50,7 @@ final class AnRoundTripComparison implements HarnessComparison {
             if (e.getMessage().startsWith(PDF_REJECTION)) {
                 return out.put("kind", "pdf");
             }
-            return out.put("error", e.getMessage());
+            return out.put(JsonDiff.ERROR, e.getMessage());
         }
         out.put("kind", "epub");
         file.header().ifPresentOrElse(
@@ -58,9 +60,10 @@ final class AnRoundTripComparison implements HarnessComparison {
         out.set("records", records(file.records()));
         if (file.header().isPresent()) {
             try {
-                out.set("reparsed", records(MoonAnnotationFile.parseText(file.withRecords(file.records()).toText()).records()));
+                MoonAnnotationFile laidOut = MoonAnnotationFile.of(file.header().get(), file.records());
+                out.set("reparsed", records(MoonAnnotationFile.parseText(laidOut.toText()).records()));
             } catch (RuntimeException e) {
-                out.putObject("reparsed").put("error", e.getMessage());
+                out.putObject("reparsed").put(JsonDiff.ERROR, e.getMessage());
             }
         }
         return out;
@@ -69,8 +72,8 @@ final class AnRoundTripComparison implements HarnessComparison {
     /** A file one side rejects in part (header or records) counts as rejected: the sides fail at different steps. */
     @Override
     public JsonNode comparable(JsonNode output) {
-        if (output.path("header").has("error") || output.path("records").has("error")) {
-            return JsonNodeFactory.instance.objectNode().put("error", "rejected");
+        if (JsonDiff.isError(output.path("header")) || JsonDiff.isError(output.path("records"))) {
+            return JsonNodeFactory.instance.objectNode().put(JsonDiff.ERROR, "rejected");
         }
         return output;
     }
@@ -82,11 +85,12 @@ final class AnRoundTripComparison implements HarnessComparison {
                     ? "PDF .an file: Grimmory rejects it, readsync parses it (spec deviation)"
                     : "readsync takes \"#A*#\" anywhere as PDF; Grimmory checks line 0 only (spec deviation)");
         }
+        boolean readsyncRejected = JsonDiff.isError(comparable(reference));
         // Only when readsync failed too: a header Java dropped from a normal file must stay a difference.
-        if (java.path("kind").asString("").equals("epub") && java.path("header").isNull() && comparable(reference).has("error")) {
+        if (java.path("kind").asString("").equals("epub") && java.path("header").isNull() && readsyncRejected) {
             return Optional.of("header-less file (deleted-notes records only): Grimmory parses it, readsync can't (spec deviation)");
         }
-        if (comparable(reference).has("error") && !java.has("error") && hasLoneHashColumn(java)) {
+        if (readsyncRejected && !JsonDiff.isError(java) && hasLoneHashColumn(java)) {
             return Optional.of("lone '#' column: Grimmory reads records by position, readsync splits on it (spec deviation)");
         }
         return Optional.empty();
@@ -95,8 +99,16 @@ final class AnRoundTripComparison implements HarnessComparison {
     @Override
     public Map<String, String> ignoredFields(HarnessInput input, JsonNode reference, JsonNode java) {
         Map<String, String> ignored = new LinkedHashMap<>();
+        if (JsonDiff.isError(java.path("reparsed")) && hasMultiLineDeletedNote(java)) {
+            // Moon+'s own unescaped multi-line deleted note doesn't fit the fixed slots; Grimmory only ever copies it
+            // verbatim (MoonAnnotationFile class comment), so there is no Java layout to compare.
+            ignored.put("/reparsed", "Moon+'s multi-line deleted note: written verbatim only, never laid out");
+        }
         for (String list : List.of("records", "reparsed")) {
             JsonNode records = java.path(list);
+            if (!records.isArray()) {
+                continue;
+            }
             for (int i = 0; i < records.size(); i++) {
                 String path = "/" + list + "/" + i;
                 ignored.put(path + "/bookmark", "readsync has no bookmark field");
@@ -108,6 +120,11 @@ final class AnRoundTripComparison implements HarnessComparison {
             }
         }
         return ignored;
+    }
+
+    private static boolean hasMultiLineDeletedNote(JsonNode java) {
+        return java.path("records").valueStream()
+                .anyMatch(record -> record.path("deleted").asBoolean() && record.path("note").asString("").contains("\n"));
     }
 
     private static boolean hasLoneHashColumn(JsonNode java) {

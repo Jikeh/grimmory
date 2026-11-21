@@ -5,7 +5,7 @@
 # dev dependencies, and its EPUB code fetches books through Grimmory's HTTP API).
 #
 # Build contexts (see ../Justfile):
-#   default   this folder (the adapter)
+#   default   this folder (the adapter package harness/ and its tests)
 #   readsync  readsync's source tree; only pyproject.toml, uv.lock, README.md and src/ are copied, and readsync's
 #             own .dockerignore keeps its secrets/state out of the build.
 
@@ -30,7 +30,7 @@ COPY --from=bridge /bridge/node_modules src/readsync/connectors/grimmory/cfi_bri
 ARG READSYNC_REVISION=unknown
 ENV READSYNC_REVISION=${READSYNC_REVISION} PATH="/app/.venv/bin:${PATH}" PYTHONPATH=/harness
 
-COPY adapter/ /harness/harness/
+COPY harness/ /harness/harness/
 COPY tests/ /harness/tests/
 RUN node --version && python -c "import readsync, harness"
 

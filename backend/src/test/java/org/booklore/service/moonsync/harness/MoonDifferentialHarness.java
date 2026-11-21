@@ -43,6 +43,8 @@ final class MoonDifferentialHarness {
 
     /** Written by the reference side beside its outputs when only some comparisons were asked for. */
     static final String SELECTION_FILE = "selection.txt";
+    private static final String MISSING = "missing reference output (registered on the Java side only?)";
+    private static final String SKIPPED = "not run (left out with --only)";
 
     /**
      * @param missing   comparisons without reference output that should have had one: a full reference run (no
@@ -144,8 +146,8 @@ final class MoonDifferentialHarness {
         StringBuilder out = new StringBuilder();
         counts(run).forEach((name, c) -> out.append(String.format("%s: %d cases, %d same, %d exempt, %d different%n",
                 name, c.total(), c.same(), c.exempt(), c.different())));
-        run.missing().forEach(name -> out.append(name).append(": MISSING reference output (not registered in the reference adapter?)\n"));
-        run.skipped().forEach(name -> out.append(name).append(": not run (left out with --only)\n"));
+        run.missing().forEach(name -> out.append(name).append(": ").append(MISSING).append('\n'));
+        run.skipped().forEach(name -> out.append(name).append(": ").append(SKIPPED).append('\n'));
         return out.toString();
     }
 
@@ -166,8 +168,8 @@ final class MoonDifferentialHarness {
         md.append("| Comparison | readsync | Cases | Same | Exempt | Different |\n|---|---|---|---|---|---|\n");
         counts(run).forEach((name, c) -> md.append(String.format("| %s | %s | %d | %d | %d | %d |%n", name,
                 run.revisions().getOrDefault(name, "?"), c.total(), c.same(), c.exempt(), c.different())));
-        run.missing().forEach(name -> md.append("| ").append(name).append(" | – | **missing reference output** | | | |\n"));
-        run.skipped().forEach(name -> md.append("| ").append(name).append(" | – | not run (left out with --only) | | | |\n"));
+        run.missing().forEach(name -> md.append("| ").append(name).append(" | – | **").append(MISSING).append("** | | | |\n"));
+        run.skipped().forEach(name -> md.append("| ").append(name).append(" | – | ").append(SKIPPED).append(" | | | |\n"));
 
         Map<String, Integer> exemptions = new TreeMap<>();
         Map<String, Integer> ignored = new TreeMap<>();

@@ -18,11 +18,18 @@ import java.util.TreeSet;
  */
 final class JsonDiff {
 
+    /** The key marking a failed side: {@code {"error": "<message>"}}. */
+    static final String ERROR = "error";
+
     /** One difference; a {@code null} side means the key or element is missing there. */
     record Difference(String path, @Nullable JsonNode reference, @Nullable JsonNode java) {
     }
 
     private JsonDiff() {
+    }
+
+    static boolean isError(@Nullable JsonNode output) {
+        return output != null && output.isObject() && output.has(ERROR);
     }
 
     static List<Difference> diff(JsonNode reference, JsonNode java, Set<String> ignored) {
@@ -43,7 +50,7 @@ final class JsonDiff {
             return;
         }
         if (reference.isObject() && java.isObject()) {
-            if (reference.has("error") && java.has("error")) {
+            if (isError(reference) && isError(java)) {
                 return;
             }
             Set<String> keys = new TreeSet<>(reference.propertyNames());

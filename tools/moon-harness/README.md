@@ -17,7 +17,7 @@ the differing fields plus the input and both full outputs.
 1. **Reference image** (`reference/Dockerfile`, `just harness build`): built from readsync's *source tree*,
    not its runtime image, with its dev dependencies (`uv sync --frozen`) and the Node CFI bridge
    (`npm ci`). The readsync revision (short commit, `-dirty` if the tree has changes) is recorded in
-   every output. The harness adapter (`reference/adapter/`, Python package `harness`) is copied in beside it.
+   every output. The harness adapter (`reference/harness/`, Python package `harness`) is copied in beside it.
 2. **Reference outputs** (`just harness reference`): the adapter finds each comparison's inputs, calls
    readsync's functions directly and writes `out/reference/<comparison>.json`: per case an `id`, the `input`
    and readsync's `output` as JSON. Book content goes through `FakeGrimmoryClient`, which answers readsync's
@@ -54,7 +54,7 @@ reference run, a comparison with a Java side but no readsync output (registered 
 | Name | readsync | Java | Compared |
 |---|---|---|---|
 | `po-roundtrip` | `po_parser.parse_po`, `serialize_po`, `with_percent` | `MoonPosition` | parsed fields; serialization of the parsed fields (percent re-formatted to one decimal); percent-only rewrites at fixed probe percents (rounding) |
-| `an-roundtrip` | `an_parser.parse_an_epub_header`, `parse_an_epub`, `serialize_an_epub` | `MoonAnnotationFile` | header; every record's fields; the records read back after each side rewrites the unchanged file |
+| `an-roundtrip` | `an_parser.parse_an_epub_header`, `parse_an_epub`, `serialize_an_epub` | `MoonAnnotationFile` | header; every record's fields; the records read back after each side's writer lays the whole file out afresh (Java: `MoonAnnotationFile.of`, Moon+'s 16-line layout) |
 
 Tickets 04, 05, 06, 07 (foliate output), 08 (MOBI6 forward only), 13, 16, 19 and 20 each add one.
 
@@ -78,10 +78,10 @@ device are never "fixed" to match readsync. The comparison declares them and the
 
 ## Adding a comparison
 
-1. **Reference side**: a module in `reference/adapter/` with `NAME`, `cases(roots)` (yield `Case(id, input)`;
+1. **Reference side**: a module in `reference/harness/` with `NAME`, `cases(roots)` (yield `Case(id, input)`;
    inputs are JSON: `{"file": "samples/…"}` / `{"file": "corpus/…"}` or `{"text": …}`, plus any keys you need)
    and `run(input, roots)` (readsync's output as JSON; failures as `{"error": "…"}`). Use `ReadsyncEnv` for book
-   content and the bridge. List it in `COMPARISONS` in `reference/adapter/__init__.py` and add a test in
+   content and the bridge. List it in `COMPARISONS` in `reference/harness/__init__.py` and add a test in
    `reference/tests/`.
 2. **Java side**: a `HarnessComparison` in `backend/src/test/java/org/booklore/service/moonsync/harness/` with
    the same name, whose `run` gives the same JSON shape from the Java library. Declare known differences with

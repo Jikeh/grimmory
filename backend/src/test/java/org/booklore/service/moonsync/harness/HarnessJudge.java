@@ -31,7 +31,7 @@ final class HarnessJudge {
             java = comparison.run(input);
         } catch (RuntimeException e) {
             // run() should report failures itself; anything escaping is a harness bug, shown as a Java-side error.
-            java = JsonNodeFactory.instance.objectNode().put("error", "harness: " + e);
+            java = JsonNodeFactory.instance.objectNode().put(JsonDiff.ERROR, "harness: " + e);
         }
         Optional<String> exemption = comparison.exemption(input, reference, java);
         if (exemption.isPresent()) {

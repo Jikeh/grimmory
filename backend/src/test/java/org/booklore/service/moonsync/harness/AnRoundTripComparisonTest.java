@@ -112,6 +112,25 @@ class AnRoundTripComparisonTest {
     }
 
     @Test
+    void reparsedRunsTheJavaLayoutWriter() {
+        // A 15-line lenient record (readsync's tombstone shape) is copied verbatim on rewrite but laid out afresh here.
+        String lenient = "#\n0\n\n\n\n3\n0\n7\n0\n0\n2\n\n0\n0\n0\n*DELETED*\n";
+        JsonNode java = comparison.run(inline("1000\nindent:true\ntrim:true\n" + lenient));
+        assertThat(java.get("reparsed").isArray()).isTrue();
+        assertThat(java.at("/reparsed/0/offset").asInt()).isEqualTo(7);
+        assertThat(java.at("/reparsed/0/deleted").asBoolean()).isTrue();
+    }
+
+    @Test
+    void moonsOwnMultiLineDeletedNoteSkipsTheLayoutComparison() {
+        HarnessInput input = inline("1000\nindent:true\ntrim:true\n" + RECORD
+                + "#\n0\n\n\n\n3\n0\n0\n0\n0\n2\n\nline one\nline two\n0\n0\n0\n*DELETED*\n");
+        JsonNode java = comparison.run(input);
+        assertThat(JsonDiff.isError(java.get("reparsed"))).isTrue();
+        assertThat(comparison.ignoredFields(input, java, java)).containsKey("/reparsed");
+    }
+
+    @Test
     void aLoneHashColumnIsExemptWhenReadsyncRejectsTheFile() {
         HarnessInput input = inline("1000\nindent:true\ntrim:true\n" + RECORD.replace("\nHello\n", "\n#\n"));
         JsonNode java = comparison.run(input);

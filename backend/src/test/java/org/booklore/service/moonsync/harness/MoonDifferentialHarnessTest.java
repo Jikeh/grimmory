@@ -32,7 +32,7 @@ class MoonDifferentialHarnessTest {
         saved.forEach(path -> System.out.println("saved regression case " + path));
 
         assertThat(run.missing())
-                .as("comparisons with a Java side but no readsync output (register them in reference/adapter/__init__.py)")
+                .as("comparisons with a Java side but no readsync output (register them in reference/harness/__init__.py)")
                 .isEmpty();
         assertThat(run.differences())
                 .as("differences from readsync (see tools/moon-harness/out/report.md):%n%s", summary)

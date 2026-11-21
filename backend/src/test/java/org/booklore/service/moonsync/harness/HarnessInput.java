@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.util.function.Function;
 
 /**
- * One case's input, as the reference adapter wrote it ({@code tools/moon-harness/reference/adapter/inputs.py}):
+ * One case's input, as the reference adapter wrote it ({@code tools/moon-harness/reference/harness/inputs.py}):
  * {@code {"file": "samples/<path>"}} / {@code {"file": "corpus/<path>"}} for a mounted file, or
  * {@code {"text": "..."}} for inline content, plus comparison-specific keys.
  *
