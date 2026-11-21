@@ -111,7 +111,11 @@ public record MoonAnnotationRecord(
         return decodeLineBreaks(note);
     }
 
-    /** The highlighted passage with {@code <BR>} decoded; a paragraph break inside the selection is one {@code \n}. */
+    /**
+     * The highlighted passage with {@code <BR>} decoded; a paragraph break inside the selection is one {@code \n}.
+     * Read-only for now: there is no encoding counterpart yet, so a caller building a multi-paragraph highlight for
+     * Moon+ must store {@code <BR>} in {@link #text()} itself (the writer refuses raw line breaks).
+     */
     public String highlightedText() {
         return decodeLineBreaks(text);
     }
@@ -125,8 +129,9 @@ public record MoonAnnotationRecord(
     /**
      * This record with the given note text, encoded the way {@code BookDb.exportNotesToText} stores it: every line
      * break becomes {@code <BR>}, so the note stays in its single fixed slot. Also used on deleted-notes records, whose
-     * notes Moon+ itself writes unescaped: an encoded note there still reads back as the same text through Moon+'s
-     * import, which decodes {@code <BR>} on every column, while an unescaped one would shift its fixed columns.
+     * notes Moon+ itself writes unescaped: there the encoding only keeps the record at Moon+'s fixed 16 lines (an
+     * unescaped extra line would shift {@code *DELETED*} out of its column); Moon+'s import deletes by chapter, split
+     * and position and never reads the note of a deleted record.
      *
      * <p>{@code \r\n} and a lone {@code \r} count as line breaks too, as they do for the {@code readLine} Moon+
      * splits the file with. Nothing else is changed. Moon+ has no escape for a literal {@code <BR>}, so a note typed

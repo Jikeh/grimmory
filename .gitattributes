@@ -37,6 +37,8 @@
 *.mustache text
 # Per RFC 4180, .csv should be CRLF
 *.csv      text eol=crlf
+# Moon+ ground-truth exports: keep the exact bytes (quoted fields hold bare LFs)
+backend/src/test/resources/moonsync/**/*.csv -text
 *.tab      text
 *.tsv      text
 *.txt      text

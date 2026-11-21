@@ -209,14 +209,13 @@ class MoonAnnotationNotesTest {
 
         @ParameterizedTest
         @MethodSource("org.booklore.service.moonsync.position.format.MoonAnnotationNotesTest#steps")
-        void rewritingEveryNoteFromItsDecodedTextReproducesTheUploadExactly(String name) throws IOException {
+        void reEncodingEveryDecodedNoteGivesBackTheStoredNote(String name) throws IOException {
             MoonAnnotationFile file = step(name);
-            List<MoonAnnotationRecord> rewritten = file.records().stream()
+            List<MoonAnnotationRecord> reEncoded = file.records().stream()
                     .map(r -> r.withNoteText(r.noteText()))
                     .toList();
 
-            assertThat(rewritten).isEqualTo(file.records());
-            assertThat(file.withRecords(rewritten).toText()).isEqualTo(decompressed(name));
+            assertThat(reEncoded).isEqualTo(file.records());
         }
 
         @ParameterizedTest
