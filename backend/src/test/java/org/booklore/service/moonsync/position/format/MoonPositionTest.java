@@ -3,6 +3,7 @@ package org.booklore.service.moonsync.position.format;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -174,6 +175,13 @@ class MoonPositionTest {
         void withPercentFormatsLikeReadsync() {
             assertThat(MoonPosition.parse("1538849237101*10@1#56325:100%").withPercent(7).serialize())
                     .isEqualTo("1538849237101*10@1#56325:7.0%");
+        }
+
+        /** Python's {@code f"{p:.1f}"} rounds the exact binary value half-to-even (found by the differential harness). */
+        @ParameterizedTest
+        @CsvSource({"0.05, 0.1", "0.25, 0.2", "0.35, 0.3", "0.45, 0.5", "2.5, 2.5", "12.345, 12.3", "33.35, 33.4", "99.95, 100.0", "0, 0.0"})
+        void withPercentRoundsLikeReadsync(double percent, String expected) {
+            assertThat(MoonPosition.epub("1", 0, 0, 0, percent, null).percentText()).isEqualTo(expected);
         }
     }
 

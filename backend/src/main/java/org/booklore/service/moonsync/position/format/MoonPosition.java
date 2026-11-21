@@ -2,7 +2,8 @@ package org.booklore.service.moonsync.position.format;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Locale;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.regex.Matcher;
 
 /**
@@ -18,7 +19,7 @@ import java.util.regex.Matcher;
  * splits it off). It is carried verbatim and never interpreted.
  *
  * <p>The percent is kept as written so a parsed position serializes back to exactly the text it came from.
- * Positions built here format the percent with one decimal, as readsync does.
+ * Positions built here format the percent with one decimal, rounded exactly as readsync does.
  */
 public sealed interface MoonPosition permits MoonPosition.Epub, MoonPosition.Pdf {
 
@@ -80,7 +81,9 @@ public sealed interface MoonPosition permits MoonPosition.Epub, MoonPosition.Pdf
         if (!Double.isFinite(percent) || percent < 0) {
             throw new IllegalArgumentException("Moon+ percent must be a finite, non-negative number: " + percent);
         }
-        return String.format(Locale.ROOT, "%.1f", percent);
+        // readsync writes f"{percent:.1f}": Python rounds the double's exact binary value half-to-even (0.25 -> 0.2,
+        // 0.35 -> 0.3), where Java's %.1f rounds its shortest decimal form half-up (0.3, 0.4).
+        return new BigDecimal(percent).setScale(1, RoundingMode.HALF_EVEN).toPlainString();
     }
 
     private static String quote(String text) {

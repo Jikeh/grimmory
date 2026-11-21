@@ -21,6 +21,12 @@ Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/do
 To check Moon+ Reader behaviour on the user's phone, use the driver in `tools/moon-device/`: read its
 `PLAYBOOK.md` first (safety rules, working loop, known traps), then `README.md` for the commands.
 
+### Differential harness against readsync
+
+To check the Java Moon+ position library against readsync (the reference), use `tools/moon-harness/` (read its
+`README.md`): `just harness run` builds readsync from its source tree in Docker, runs both sides on the same
+inputs and fails on any difference.
+
 ### The user's running Grimmory instance
 
 To look at real data or exercise the API of the user's own Grimmory (`http://grimmory.jikeh.lan`), use

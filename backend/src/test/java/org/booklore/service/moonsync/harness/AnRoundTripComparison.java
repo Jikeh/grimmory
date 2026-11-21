@@ -1,0 +1,131 @@
+package org.booklore.service.moonsync.harness;
+
+import org.booklore.service.moonsync.position.format.MoonAnnotationFile;
+import org.booklore.service.moonsync.position.format.MoonAnnotationRecord;
+import org.booklore.service.moonsync.position.format.MoonFormatException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Comparison {@code an-roundtrip}: {@link MoonAnnotationFile} against readsync's EPUB {@code an_parser}
+ * ({@code parse_an_epub_header}, {@code parse_an_epub}, {@code serialize_an_epub}); reference side
+ * {@code reference/adapter/an_roundtrip.py}. Compared on decompressed text: header, every record's fields, and the
+ * records read back after each side writes the unchanged file.
+ *
+ * <p>Known differences, never compared (spec "Where this deliberately differs from readsync"; ticket 02):
+ * <ul>
+ *   <li>Note text. readsync has no bookmark or note field and folds both slots into {@code text}, so Java's
+ *       {@code bookmark}/{@code note} are reported but not compared, and {@code text} is skipped on records where
+ *       either is non-empty.</li>
+ *   <li>PDF {@code .an} files (Grimmory rejects them), header-less files and lone {@code #} columns (Grimmory
+ *       parses them; readsync can't): the whole case is exempt.</li>
+ * </ul>
+ */
+final class AnRoundTripComparison implements HarnessComparison {
+
+    /** Start of {@link MoonAnnotationFile}'s rejection message for the PDF sub-format. */
+    private static final String PDF_REJECTION = "PDF .an files are not supported";
+
+    @Override
+    public String name() {
+        return "an-roundtrip";
+    }
+
+    @Override
+    public JsonNode run(HarnessInput input) {
+        ObjectNode out = JsonNodeFactory.instance.objectNode();
+        MoonAnnotationFile file;
+        try {
+            file = input.isFile() ? MoonAnnotationFile.parse(input.bytes()) : MoonAnnotationFile.parseText(input.text());
+        } catch (MoonFormatException e) {
+            if (e.getMessage().startsWith(PDF_REJECTION)) {
+                return out.put("kind", "pdf");
+            }
+            return out.put("error", e.getMessage());
+        }
+        out.put("kind", "epub");
+        file.header().ifPresentOrElse(
+                header -> out.putObject("header").put("totalLength", header.totalLength())
+                        .put("indent", header.indent()).put("trim", header.trim()),
+                () -> out.putNull("header"));
+        out.set("records", records(file.records()));
+        if (file.header().isPresent()) {
+            try {
+                out.set("reparsed", records(MoonAnnotationFile.parseText(file.withRecords(file.records()).toText()).records()));
+            } catch (RuntimeException e) {
+                out.putObject("reparsed").put("error", e.getMessage());
+            }
+        }
+        return out;
+    }
+
+    /** A file one side rejects in part (header or records) counts as rejected: the sides fail at different steps. */
+    @Override
+    public JsonNode comparable(JsonNode output) {
+        if (output.path("header").has("error") || output.path("records").has("error")) {
+            return JsonNodeFactory.instance.objectNode().put("error", "rejected");
+        }
+        return output;
+    }
+
+    @Override
+    public Optional<String> exemption(HarnessInput input, JsonNode reference, JsonNode java) {
+        if (reference.path("kind").asString("").equals("pdf")) {
+            return Optional.of(java.path("kind").asString("").equals("pdf")
+                    ? "PDF .an file: Grimmory rejects it, readsync parses it (spec deviation)"
+                    : "readsync takes \"#A*#\" anywhere as PDF; Grimmory checks line 0 only (spec deviation)");
+        }
+        if (java.path("kind").asString("").equals("epub") && java.path("header").isNull()) {
+            return Optional.of("header-less file (deleted-notes records only): Grimmory parses it, readsync can't (spec deviation)");
+        }
+        if (comparable(reference).has("error") && !java.has("error") && hasLoneHashColumn(java)) {
+            return Optional.of("lone '#' column: Grimmory reads records by position, readsync splits on it (spec deviation)");
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public Map<String, String> ignoredFields(HarnessInput input, JsonNode reference, JsonNode java) {
+        Map<String, String> ignored = new LinkedHashMap<>();
+        for (String list : List.of("records", "reparsed")) {
+            JsonNode records = java.path(list);
+            for (int i = 0; i < records.size(); i++) {
+                String path = "/" + list + "/" + i;
+                ignored.put(path + "/bookmark", "readsync has no bookmark field");
+                ignored.put(path + "/note", "readsync has no note field (note text: spec deviation)");
+                JsonNode record = records.get(i);
+                if (!record.path("bookmark").asString("").isEmpty() || !record.path("note").asString("").isEmpty()) {
+                    ignored.put(path + "/text", "readsync folds the bookmark/note slots into text (note text: spec deviation)");
+                }
+            }
+        }
+        return ignored;
+    }
+
+    private static boolean hasLoneHashColumn(JsonNode java) {
+        return java.path("records").valueStream()
+                .flatMap(record -> record.properties().stream().map(Map.Entry::getValue))
+                .anyMatch(value -> value.isString() && value.asString().equals("#"));
+    }
+
+    private static ArrayNode records(List<MoonAnnotationRecord> records) {
+        ArrayNode array = JsonNodeFactory.instance.arrayNode();
+        for (MoonAnnotationRecord r : records) {
+            array.addObject()
+                    .put("id", r.id()).put("filename", r.filename()).put("path", r.path()).put("lowerPath", r.lowerPath())
+                    .put("chapter", r.chapter()).put("split", r.split()).put("offset", r.offset()).put("length", r.length())
+                    .put("color", r.color()).put("time", r.time())
+                    .put("bookmark", r.bookmark()).put("note", r.note()).put("text", r.text())
+                    .put("underline", r.underline()).put("strikethrough", r.strikethrough()).put("bak", r.bak())
+                    .put("deleted", r.isDeleted());
+        }
+        return array;
+    }
+}

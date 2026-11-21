@@ -1,0 +1,48 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+set working-directory := '.'
+
+# Folders, overridable from the environment. Corpus and samples are mounted read-only.
+readsync_dir := env_var_or_default('MOON_HARNESS_READSYNC', source_directory() + '/../../../readsync')
+corpus_dir := env_var_or_default('MOON_HARNESS_CORPUS', source_directory() + '/../../backend/src/test/resources/moonsync/books')
+samples_dir := env_var_or_default('MOON_HARNESS_SAMPLES', source_directory() + '/../../backend/src/test/resources/moonsync')
+out_dir := env_var_or_default('MOON_HARNESS_OUT', source_directory() + '/out')
+image := 'grimmory-moon-harness-reference'
+repo_dir := source_directory() + '/../..'
+harness_test := 'org.booklore.service.moonsync.harness.MoonDifferentialHarnessTest'
+
+# Absolute host path in the form Docker accepts (C:/… under Git Bash on Windows).
+_abs := 'abs() { (cd "$1" && (pwd -W 2>/dev/null || pwd)); }'
+
+# Run both sides and compare (readsync reference outputs, then the Java side); non-zero exit on any difference. `just harness run --save` also writes each difference as a Java regression case.
+run *flags: build reference (java flags)
+
+# Build the reference image from readsync's source tree (dev dependencies and the Node bridge included).
+build:
+    rev="$(git -C "{{ readsync_dir }}" rev-parse --short HEAD 2>/dev/null || echo unknown)"; \
+    if [[ -n "$(git -C "{{ readsync_dir }}" status --porcelain 2>/dev/null)" ]]; then rev="$rev-dirty"; fi; \
+    docker build -t "{{ image }}" --build-context "readsync={{ readsync_dir }}" --build-arg "READSYNC_REVISION=$rev" reference
+
+# Write readsync's outputs to out/reference/ (one JSON per comparison), e.g. `just harness reference --only po-roundtrip`.
+reference *args:
+    {{ _abs }}; mkdir -p "{{ out_dir }}"; \
+    MSYS_NO_PATHCONV=1 docker run --rm \
+      -v "$(abs "{{ samples_dir }}"):/samples:ro" -v "$(abs "{{ corpus_dir }}"):/corpus:ro" -v "$(abs "{{ out_dir }}"):/out" \
+      "{{ image }}" reference {{ args }}
+
+# Compare the Java library against out/reference/ in the JDK 25 image and write out/report.md; `--save` writes differences as regression cases.
+java *flags:
+    {{ _abs }}; save=""; \
+    for flag in {{ flags }}; do [[ "$flag" == --save ]] && save=1 || { echo "unknown flag: $flag (known: --save)" >&2; exit 2; }; done; \
+    MSYS_NO_PATHCONV=1 docker compose -f "$(abs "{{ repo_dir }}")/dev.docker-compose.yml" run --rm --no-deps -T \
+      -v "$(abs "{{ samples_dir }}"):/harness/samples:ro" -v "$(abs "{{ corpus_dir }}"):/harness/corpus:ro" -v "$(abs "{{ out_dir }}"):/harness/out" \
+      -e MOON_HARNESS_DIR=/harness -e "MOON_HARNESS_SAVE=$save" \
+      backend sh -c 'cd /backend && ./gradlew test --no-daemon --rerun --tests "{{ harness_test }}" -x jacocoTestReport'
+
+# Check the fake Grimmory client and the Node bridge against the corpus.
+selftest: build
+    {{ _abs }}; \
+    MSYS_NO_PATHCONV=1 docker run --rm -v "$(abs "{{ corpus_dir }}"):/corpus:ro" "{{ image }}" selftest
+
+# Run the reference adapter's own tests inside the reference image.
+test-reference: build
+    MSYS_NO_PATHCONV=1 docker run --rm --entrypoint python "{{ image }}" -m pytest -q -p no:cacheprovider /harness/tests

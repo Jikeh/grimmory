@@ -38,7 +38,9 @@ changed; the `.po` only when the position changed, except on a forced "Sync to c
 - `device` is a per-install random id; this phone always writes `1738611943423`. [device]
 - `percent` has one decimal (`0.0%`, `32.6%`), except at the very end of a book, which is **`100%` with no
   decimal** [device: ulysses `po-end-of-book`, pride `po-end-of-book`]. Ticket 01's parser accepts it; positions
-  Grimmory builds format as `100.0`, which differs from what Moon+ writes.
+  Grimmory builds format as `100.0`, which differs from what Moon+ writes. Built percents round like readsync's
+  `f"{p:.1f}"`: the double's exact binary value, half to even (`0.25` → `0.2`, `0.35` → `0.3`), not Java's
+  `%.1f` (`0.3`, `0.4`). [differential harness, ticket 03]
 
 ### `chapter`: index into Moon+'s chapter list
 
