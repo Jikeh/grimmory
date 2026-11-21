@@ -13,6 +13,9 @@ section (`.scratch/moon-sync/spec.md`).
 2. **Connection:** `.tools/platform-tools/adb.exe devices -l`. If the device is `offline` or missing,
    `adb connect <IP:port>`. If the port changed or pairing was lost, ask the user for the address on
    Settings → Developer options → Wireless debugging (and a pairing code if needed). Never guess a port.
+   The port changes every session: when `adb devices -l` lists the phone under its mDNS name
+   (`adb-<serial>._adb-tls-connect._tcp`), use that, `export MOON_DEVICE_SERIAL=<that name>` (a real
+   environment variable wins over `.env`).
 3. **Look before acting:** `uv run python moon_device.py ui`. It saves captures and lists the widgets
    plus the foreground activity. Read the PNG too, since book text isn't in the widget list. The last
    session may have left a popup or selection open.
