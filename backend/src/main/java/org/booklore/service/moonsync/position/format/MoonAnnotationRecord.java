@@ -26,9 +26,14 @@ import java.util.Objects;
  * 15 strikethrough 0/1
  * 16 bak           squiggly-underline flag ("1"/"0") on live rows; "*DELETED*" on deleted-notes records
  * </pre>
- * Values are kept exactly as stored. Live rows escape newlines as {@code <BR>}; deleted-notes records
- * ({@code BookDb.deletedNotesToText}) write their bookmark and note unescaped, so on those records {@code note}
- * may hold real newlines. Decoding of note content is completed in ticket 02.
+ * Values are kept exactly as stored. Live rows escape newlines as {@code <BR>} in every column; deleted-notes
+ * records ({@code BookDb.deletedNotesToText}) write their bookmark and note unescaped, so on those records
+ * {@code note} may hold real newlines. {@link #noteText()} and {@link #highlightedText()} give the decoded text, and
+ * {@link #withNoteText} encodes a note for writing.
+ *
+ * <p>Note slot, confirmed on Moon+ 10.8 uploads (fixtures in {@code moonsync/format/notes/}): the note is always
+ * column 12, between the bookmark (11) and the highlighted text (13), whether empty or not; a bookmark row has its
+ * name in column 11 and an empty note and text. Parse by position, never by skipping blank lines.
  *
  * <p>Field names follow Moon+'s columns; readsync calls them annotation_id, filename, path, path_lower,
  * chapter_index, sub_index, start_offset, span_length, color_argb, created_at_ms, text and trailer.
@@ -53,6 +58,9 @@ public record MoonAnnotationRecord(
 
     /** The {@code bak} value {@code BookDb.deletedNotesToText} writes on deleted-notes records. */
     public static final String DELETED_MARKER = "*DELETED*";
+
+    /** What {@code BookDb.exportNotesToText} writes for each line break in a column, and import reads back as one. */
+    private static final String LINE_BREAK_ESCAPE = "<BR>";
 
     /** What a record stands for. Only {@link #HIGHLIGHT} records are ever synced as highlights. */
     public enum Kind {
@@ -94,9 +102,46 @@ public record MoonAnnotationRecord(
                 bookmark, note, text, underline, strikethrough, bak);
     }
 
+    /**
+     * The note as the user wrote it: {@link #note()} with Moon+'s {@code <BR>} line-break escape decoded, the way
+     * {@code BookDb.importNotesFromText} reads every column back. Never trimmed: Moon+ stores the text box's content
+     * exactly, so trailing spaces (typically from the phone keyboard) are part of the note. Empty when there is none.
+     */
+    public String noteText() {
+        return decodeLineBreaks(note);
+    }
+
+    /** The highlighted passage with {@code <BR>} decoded; a paragraph break inside the selection is one {@code \n}. */
+    public String highlightedText() {
+        return decodeLineBreaks(text);
+    }
+
+    /** This record with its raw note slot set as stored, without encoding (see {@link #withNoteText}). */
     public MoonAnnotationRecord withNote(String newNote) {
         return new MoonAnnotationRecord(id, filename, path, lowerPath, chapter, split, offset, length, color, time,
                 bookmark, newNote, text, underline, strikethrough, bak);
+    }
+
+    /**
+     * This record with the given note text, encoded the way {@code BookDb.exportNotesToText} stores it: every line
+     * break becomes {@code <BR>}, so the note stays in its single fixed slot. Also used on deleted-notes records, whose
+     * notes Moon+ itself writes unescaped: an encoded note there still reads back as the same text through Moon+'s
+     * import, which decodes {@code <BR>} on every column, while an unescaped one would shift its fixed columns.
+     *
+     * <p>{@code \r\n} and a lone {@code \r} count as line breaks too, as they do for the {@code readLine} Moon+
+     * splits the file with. Nothing else is changed. Moon+ has no escape for a literal {@code <BR>}, so a note typed
+     * with one reads back with a line break in its place, in Moon+ and in {@link #noteText()} alike.
+     */
+    public MoonAnnotationRecord withNoteText(String newNoteText) {
+        return withNote(encodeLineBreaks(Objects.requireNonNull(newNoteText, "newNoteText")));
+    }
+
+    private static String decodeLineBreaks(String stored) {
+        return stored.replace(LINE_BREAK_ESCAPE, "\n");
+    }
+
+    private static String encodeLineBreaks(String value) {
+        return value.replace("\r\n", "\n").replace('\r', '\n').replace("\n", LINE_BREAK_ESCAPE);
     }
 
     public MoonAnnotationRecord withText(String newText) {

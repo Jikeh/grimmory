@@ -161,6 +161,31 @@ header when the book has no live notes; then the file is only `*DELETED*` record
 | 12 | original | the selected text; a paragraph break inside it is stored as `<BR>` [pride `P3`] |
 | 13–15 | underline, strikethrough, bak (squiggly) | `0`/`0`/`0` for the default style |
 
+### Note slot
+
+Confirmed on Moon+ 10.8 uploads [device: `backend/src/test/resources/moonsync/format/notes/`, steps 01–13,
+checked against the app's own `notes` table; [decompiled] `BookDb.exportNotesToText`, `alGet`]:
+
+- The note is **always field 11**, between bookmark (10) and original (12), empty or not. Records are read by
+  position; readsync's "strip blank lines as padding" would move a real note into the text.
+- Export replaces `
+` with `<BR>` in **every** column; import turns every `<BR>` back into `
+`
+  (case-sensitive). There is no escape for a literal `<BR>`: typed into a note, it comes back as a line break.
+- Note text is stored exactly as the text box returns it, never trimmed. Every sample note and bookmark name
+  ends with a space; it comes from the phone keyboard, not Moon+ (`PrefEditNote`). Accents, quotes, `#$*:`
+  and emoji are stored verbatim.
+- A bookmark keeps its name in field 10 with empty note and original; a squiggly highlight has `bak` `1`.
+- An edited note rewrites the same record; the old text isn't kept anywhere.
+- Deleted records write the note unescaped (real newlines), but import still decodes `<BR>`. Grimmory writes
+  every note `<BR>`-encoded, deleted records included, so each record keeps Moon+'s fixed 16 lines;
+  Moon+'s own multi-line deleted records are left verbatim while unchanged.
+- Grimmory treats `
+` and `` as line breaks when encoding (Moon+'s `readLine` would split on them).
+
+In code: `MoonAnnotationRecord.noteText()` / `highlightedText()` decode, `withNoteText()` encodes; the raw
+`note()` / `text()` stay as stored.
+
 ### Deleted record
 
 `#`, `0`, `0`, `0`, `0`, chapter, split, position, `0`, `0`, time, bookmark, note (newlines **not**
@@ -215,6 +240,8 @@ The export also keeps only notes that match Moon+'s current annotation list by (
 - **`100%` without a decimal** at the end of a book.
 - **Forced "Sync to cloud" can upload a stale position.**
 - **Lost notes at a shared (chapter, split, position)**: new.
+- **Note text** is read from its fixed slot and synced; readsync reads every note as empty (its writer always
+  leaves the slot blank).
 - Upgraded from readsync/decompiled to **[device]**: the split rule including the `>` fallback, the
   per-chunk offset reset and the `[n/N]` marker; NCX-ordinal chapter index; invisible characters and
   paragraph breaks counting one each.

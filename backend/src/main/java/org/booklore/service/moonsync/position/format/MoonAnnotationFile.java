@@ -42,8 +42,7 @@ import java.util.zip.ZipException;
  * exact lines it was read from, so bookmarks and records this parser reads leniently (e.g. readsync's
  * 15-line tombstone sample) survive untouched. Only new or changed records are written in Moon+'s 16-line layout,
  * and every one of their fields must be a single line, deleted-notes notes included: Moon+ reads by fixed index,
- * so a multi-line field would shift its columns. Encoding line breaks as {@code <BR>} is the caller's job
- * (ticket 02).
+ * so a multi-line field would shift its columns. Notes are encoded with {@link MoonAnnotationRecord#withNoteText}.
  * Round-trips are defined on the decompressed text; zlib bytes may differ from Moon+'s.
  *
  * <p>The PDF {@code .an} sub-format (tagged {@code #A*#} fields) is recognized only to be rejected: Moon+ sync

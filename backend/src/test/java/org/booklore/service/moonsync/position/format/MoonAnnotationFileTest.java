@@ -26,8 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * are out of scope for Moon+ sync (a listed deviation in the spec), so the parser recognizes the PDF sub-format
  * only to reject it clearly.
  *
- * <p>Note-slot content (escaping, multi-line notes on live records) is completed in ticket 02; the cases here
- * only use the empty note slot every readsync sample has, plus the raw deleted-notes shape.
+ * <p>Note-slot content (decoding, encoding, device samples) is covered by {@link MoonAnnotationNotesTest}; the cases
+ * here only use the empty note slot every readsync sample has, plus the raw deleted-notes shape.
  */
 class MoonAnnotationFileTest {
 
