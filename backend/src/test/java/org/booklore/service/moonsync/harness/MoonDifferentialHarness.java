@@ -41,14 +41,38 @@ final class MoonDifferentialHarness {
     /** Every comparison, by name. Adding one: implement {@link HarnessComparison} and list it here (README). */
     static final Map<String, HarnessComparison> COMPARISONS = registry(new PoRoundTripComparison(), new AnRoundTripComparison());
 
+    /** Written by the reference side beside its outputs when only some comparisons were asked for. */
+    static final String SELECTION_FILE = "selection.txt";
+
     /**
-     * @param missing     comparisons without reference output (not run on the reference side, e.g. {@code --only})
-     * @param revisions   readsync revision per comparison, as the reference image recorded it
+     * @param missing   comparisons without reference output that should have had one: a full reference run (no
+     *                  {@value #SELECTION_FILE}) covers every comparison, so a missing one means the Java and Python
+     *                  registries disagree. Fails the run like a difference.
+     * @param skipped   comparisons left out on purpose ({@code reference --only})
+     * @param revisions readsync revision per comparison, as the reference image recorded it
      */
-    record Run(List<CaseResult> results, List<String> missing, Map<String, String> revisions) {
+    record Run(List<CaseResult> results, List<String> missing, List<String> skipped, Map<String, String> revisions) {
 
         List<CaseResult> differences() {
             return results.stream().filter(r -> r.status() == Status.DIFFERENT).toList();
+        }
+    }
+
+    /** Case counts of one comparison. */
+    record Counts(int same, int exempt, int different) {
+
+        static final Counts NONE = new Counts(0, 0, 0);
+
+        int total() {
+            return same + exempt + different;
+        }
+
+        Counts plus(Status status) {
+            return switch (status) {
+                case SAME -> new Counts(same + 1, exempt, different);
+                case EXEMPT -> new Counts(same, exempt + 1, different);
+                case DIFFERENT -> new Counts(same, exempt, different + 1);
+            };
         }
     }
 
@@ -90,7 +114,18 @@ final class MoonDifferentialHarness {
                 results.add(HarnessJudge.judge(comparison, c.get("id").asString(), new HarnessInput(c.get("input"), files), c.get("output")));
             }
         }
-        return new Run(results, missing, revisions);
+        List<String> skipped = new ArrayList<>();
+        Path selection = referenceDir.resolve(SELECTION_FILE);
+        if (Files.isRegularFile(selection)) {
+            try {
+                List<String> selected = Files.readAllLines(selection).stream().map(String::strip).filter(s -> !s.isEmpty()).toList();
+                skipped.addAll(missing.stream().filter(name -> !selected.contains(name)).toList());
+                missing.removeAll(skipped);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        return new Run(results, missing, skipped, revisions);
     }
 
     // --- report ---
@@ -107,16 +142,17 @@ final class MoonDifferentialHarness {
 
     static String summary(Run run) {
         StringBuilder out = new StringBuilder();
-        Map<String, int[]> counts = counts(run);
-        counts.forEach((name, c) -> out.append(String.format("%s: %d cases, %d same, %d exempt, %d different%n", name, c[0] + c[1] + c[2], c[0], c[1], c[2])));
-        run.missing().forEach(name -> out.append(name).append(": not run (no reference output)\n"));
+        counts(run).forEach((name, c) -> out.append(String.format("%s: %d cases, %d same, %d exempt, %d different%n",
+                name, c.total(), c.same(), c.exempt(), c.different())));
+        run.missing().forEach(name -> out.append(name).append(": MISSING reference output (not registered in the reference adapter?)\n"));
+        run.skipped().forEach(name -> out.append(name).append(": not run (left out with --only)\n"));
         return out.toString();
     }
 
-    private static Map<String, int[]> counts(Run run) {
-        Map<String, int[]> counts = new TreeMap<>();
+    private static Map<String, Counts> counts(Run run) {
+        Map<String, Counts> counts = new TreeMap<>();
         for (CaseResult r : run.results()) {
-            counts.computeIfAbsent(r.comparison(), k -> new int[3])[r.status().ordinal()]++;
+            counts.put(r.comparison(), counts.getOrDefault(r.comparison(), Counts.NONE).plus(r.status()));
         }
         return counts;
     }
@@ -124,10 +160,14 @@ final class MoonDifferentialHarness {
     private static String markdown(Run run) {
         StringBuilder md = new StringBuilder("# Moon+ differential harness report\n\n");
         md.append(run.differences().isEmpty() ? "**No differences.**\n\n" : "**" + run.differences().size() + " differing case(s).**\n\n");
+        if (!run.missing().isEmpty()) {
+            md.append("**Missing reference output for: ").append(String.join(", ", run.missing())).append(".**\n\n");
+        }
         md.append("| Comparison | readsync | Cases | Same | Exempt | Different |\n|---|---|---|---|---|---|\n");
         counts(run).forEach((name, c) -> md.append(String.format("| %s | %s | %d | %d | %d | %d |%n", name,
-                run.revisions().getOrDefault(name, "?"), c[0] + c[1] + c[2], c[0], c[1], c[2])));
-        run.missing().forEach(name -> md.append("| ").append(name).append(" | – | not run (no reference output) | | | |\n"));
+                run.revisions().getOrDefault(name, "?"), c.total(), c.same(), c.exempt(), c.different())));
+        run.missing().forEach(name -> md.append("| ").append(name).append(" | – | **missing reference output** | | | |\n"));
+        run.skipped().forEach(name -> md.append("| ").append(name).append(" | – | not run (left out with --only) | | | |\n"));
 
         Map<String, Integer> exemptions = new TreeMap<>();
         Map<String, Integer> ignored = new TreeMap<>();
@@ -166,9 +206,9 @@ final class MoonDifferentialHarness {
     private static ObjectNode reportJson(Run run) {
         ObjectNode report = JSON.createObjectNode();
         report.put("differences", run.differences().size());
-        report.set("summary", JSON.valueToTree(counts(run).entrySet().stream().collect(TreeMap::new,
-                (m, e) -> m.put(e.getKey(), Map.of("same", e.getValue()[0], "exempt", e.getValue()[1], "different", e.getValue()[2])), Map::putAll)));
+        report.set("summary", JSON.valueToTree(counts(run)));
         report.set("missing", JSON.valueToTree(run.missing()));
+        report.set("skipped", JSON.valueToTree(run.skipped()));
         ArrayNode cases = report.putArray("cases");
         run.results().stream().filter(r -> r.status() != Status.SAME).forEach(r -> cases.add(caseJson(r)));
         return report;

@@ -50,7 +50,7 @@ class MoonDifferentialHarnessRunnerTest {
         });
         assertThat(run.missing()).containsExactly("an-roundtrip");
         assertThat(MoonDifferentialHarness.summary(run)).contains("po-roundtrip: 2 cases, 1 same, 0 exempt, 1 different")
-                .contains("an-roundtrip: not run");
+                .contains("an-roundtrip: MISSING");
 
         MoonDifferentialHarness.writeReport(run, harness.resolve("out"));
         String report = Files.readString(harness.resolve("out/report.md"));
@@ -79,6 +79,15 @@ class MoonDifferentialHarnessRunnerTest {
         MoonDifferentialHarness.writeReport(run, harness.resolve("out"));
         assertThat(run.differences()).isEmpty();
         assertThat(Files.readString(harness.resolve("out/report.md"))).contains("No differences.");
+    }
+
+    @Test
+    void comparisonsLeftOutWithOnlyAreSkippedNotMissing() throws IOException {
+        reference("po-roundtrip", "[]");
+        Files.writeString(harness.resolve("out/reference/" + MoonDifferentialHarness.SELECTION_FILE), "po-roundtrip\n");
+        MoonDifferentialHarness.Run run = MoonDifferentialHarness.run(harness, MoonDifferentialHarness.COMPARISONS);
+        assertThat(run.missing()).isEmpty();
+        assertThat(run.skipped()).containsExactly("an-roundtrip");
     }
 
     @Test

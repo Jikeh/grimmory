@@ -113,6 +113,19 @@ def test_write_reference_writes_one_document_per_comparison(roots: Roots, tmp_pa
     assert [c["id"] for c in document["cases"]][0] == "samples/format/a.po"
 
 
+def test_write_reference_records_a_partial_selection(roots: Roots, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    assert write_reference(roots, out, ["po-roundtrip"]) == 0
+    assert (out / "reference" / "selection.txt").read_text(encoding="utf-8") == "po-roundtrip\n"
+    assert write_reference(roots, out, []) == 0
+    assert not (out / "reference" / "selection.txt").exists()
+
+
+def test_roots_refuse_unknown_root_names(roots: Roots) -> None:
+    with pytest.raises(ValueError):
+        roots.root("elsewhere")
+
+
 def test_write_reference_rejects_unknown_names(roots: Roots, tmp_path: Path) -> None:
     assert write_reference(roots, tmp_path / "out", ["nope"]) == 2
 

@@ -22,19 +22,25 @@ class Roots:
     samples: Path
     corpus: Path
 
+    def root(self, name: str) -> Path:
+        if name == "samples":
+            return self.samples
+        if name == "corpus":
+            return self.corpus
+        raise ValueError(f"unknown input root {name!r}; expected samples or corpus")
+
     def resolve(self, ref: str) -> Path:
         root_name, _, relative = ref.partition("/")
-        root = {"samples": self.samples, "corpus": self.corpus}.get(root_name)
-        if root is None or not relative:
+        if root_name not in ("samples", "corpus") or not relative:
             raise ValueError(f"input file must be samples/<path> or corpus/<path>, got {ref!r}")
+        root = self.root(root_name)
         path = (root / relative).resolve()
         if not path.is_relative_to(root.resolve()):
             raise ValueError(f"input file escapes its root: {ref!r}")
         return path
 
     def ref(self, root_name: str, path: Path) -> str:
-        root = self.samples if root_name == "samples" else self.corpus
-        return f"{root_name}/{path.relative_to(root).as_posix()}"
+        return f"{root_name}/{path.relative_to(self.root(root_name)).as_posix()}"
 
 
 @dataclass(frozen=True)
@@ -55,7 +61,7 @@ def read_text(case_input: dict[str, Any], roots: Roots) -> str:
 
 
 def files(roots: Roots, root_name: str, suffix: str) -> Iterator[Path]:
-    root = roots.samples if root_name == "samples" else roots.corpus
+    root = roots.root(root_name)
     if not root.is_dir():
         return iter(())
     return iter(sorted(p for p in root.rglob(f"*{suffix}") if p.is_file()))

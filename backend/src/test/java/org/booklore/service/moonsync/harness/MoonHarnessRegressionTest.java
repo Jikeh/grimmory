@@ -12,7 +12,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Differences the harness found, saved as regression cases ({@code just harness run save=1}) in
+ * Differences the harness found, saved as regression cases ({@code just harness run --save}) in
  * {@code src/test/resources/moonsync/harness/regressions/<comparison>/}: each must now match readsync's recorded
  * output, or be a declared exemption. Runs in the normal test suite; needs neither readsync nor Docker.
  */

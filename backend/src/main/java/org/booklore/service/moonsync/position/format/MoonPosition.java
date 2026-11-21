@@ -82,7 +82,8 @@ public sealed interface MoonPosition permits MoonPosition.Epub, MoonPosition.Pdf
             throw new IllegalArgumentException("Moon+ percent must be a finite, non-negative number: " + percent);
         }
         // readsync writes f"{percent:.1f}": Python rounds the double's exact binary value half-to-even (0.25 -> 0.2,
-        // 0.35 -> 0.3), where Java's %.1f rounds its shortest decimal form half-up (0.3, 0.4).
+        // 0.35 -> 0.3), where Java's %.1f rounds its shortest decimal form half-up (0.3, 0.4). One deliberate
+        // difference: -0.0 (allowed by the guard above) gives "0.0" here and "-0.0" in Python; Moon+ never writes it.
         return new BigDecimal(percent).setScale(1, RoundingMode.HALF_EVEN).toPlainString();
     }
 

@@ -108,6 +108,7 @@ class AnRoundTripComparisonTest {
         assertThat(java.get("header").isNull()).isTrue();
         assertThat(comparison.exemption(input, JSON.readTree("{\"kind\":\"epub\",\"header\":{\"error\":\"x\"},\"records\":{\"error\":\"x\"}}"), java))
                 .isPresent();
+        assertThat(comparison.exemption(input, java, java)).as("readsync parsed it, so compare").isEmpty();
     }
 
     @Test

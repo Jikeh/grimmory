@@ -21,6 +21,7 @@ from harness import COMPARISONS
 from harness.inputs import Roots, files
 
 FORMAT_VERSION = 1
+SELECTION_FILE = "selection.txt"
 
 
 def write_reference(roots: Roots, out: Path, only: list[str]) -> int:
@@ -30,8 +31,11 @@ def write_reference(roots: Roots, out: Path, only: list[str]) -> int:
         return 2
     target = out / "reference"
     target.mkdir(parents=True, exist_ok=True)
-    for stale in target.glob("*.json"):
-        stale.unlink()
+    for stale in [*target.glob("*.json"), target / SELECTION_FILE]:
+        stale.unlink(missing_ok=True)
+    if only:
+        # Tells the Java side the others were left out on purpose; without it a missing comparison fails the run.
+        (target / SELECTION_FILE).write_text("\n".join(only) + "\n", encoding="utf-8")
     for name, module in COMPARISONS.items():
         if only and name not in only:
             continue

@@ -46,7 +46,8 @@ captures (one highlight record, with the file's header recorded beside it) and `
 
 Other commands: `just harness selftest` (the fake client and the Node bridge against the corpus),
 `just harness test-reference` (the adapter's own pytest suite, in the reference image),
-`just harness reference --only <name>` (one comparison; the others show as "not run" in the report).
+`just harness reference --only <name>` (one comparison; the others show as "not run" in the report). In a full
+reference run, a comparison with a Java side but no readsync output (registered on one side only) fails the run.
 
 ## Comparisons
 

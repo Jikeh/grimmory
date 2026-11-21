@@ -82,7 +82,8 @@ final class AnRoundTripComparison implements HarnessComparison {
                     ? "PDF .an file: Grimmory rejects it, readsync parses it (spec deviation)"
                     : "readsync takes \"#A*#\" anywhere as PDF; Grimmory checks line 0 only (spec deviation)");
         }
-        if (java.path("kind").asString("").equals("epub") && java.path("header").isNull()) {
+        // Only when readsync failed too: a header Java dropped from a normal file must stay a difference.
+        if (java.path("kind").asString("").equals("epub") && java.path("header").isNull() && comparable(reference).has("error")) {
             return Optional.of("header-less file (deleted-notes records only): Grimmory parses it, readsync can't (spec deviation)");
         }
         if (comparable(reference).has("error") && !java.has("error") && hasLoneHashColumn(java)) {
