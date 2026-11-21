@@ -299,6 +299,21 @@ class MoonAnnotationNotesTest {
         }
 
         @Test
+        void reEncodingMoonsOwnMultiLineDeletedNoteReadsTheSameButIsNoLongerVerbatim() {
+            String deleted = "#\n0\n0\n0\n0\n12\n0\n300\n0\n0\n1784406712345\n\nfirst\nsecond\n0\n0\n0\n*DELETED*\n";
+            MoonAnnotationFile file = MoonAnnotationFile.parseText("1000\nindent:true\ntrim:true\n" + deleted);
+            MoonAnnotationRecord parsed = file.records().getFirst();
+
+            MoonAnnotationRecord reEncoded = parsed.withNoteText(parsed.noteText());
+            String rewritten = file.withRecords(List.of(reEncoded)).toText();
+
+            assertThat(reEncoded).isNotEqualTo(parsed);
+            assertThat(reEncoded.noteText()).isEqualTo(parsed.noteText()).isEqualTo("first\nsecond");
+            assertThat(rewritten).endsWith("\n\nfirst<BR>second\n0\n0\n0\n*DELETED*\n");
+            assertThat(file.withRecords(List.of(parsed)).toText()).endsWith("\n\nfirst\nsecond\n0\n0\n0\n*DELETED*\n");
+        }
+
+        @Test
         void rejectsANullNote() {
             assertThatThrownBy(() -> highlight("").withNoteText(null)).isInstanceOf(NullPointerException.class);
         }

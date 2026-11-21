@@ -131,6 +131,10 @@ public record MoonAnnotationRecord(
      * <p>{@code \r\n} and a lone {@code \r} count as line breaks too, as they do for the {@code readLine} Moon+
      * splits the file with. Nothing else is changed. Moon+ has no escape for a literal {@code <BR>}, so a note typed
      * with one reads back with a line break in its place, in Moon+ and in {@link #noteText()} alike.
+     *
+     * <p>Call it only when the note text actually changed. On one of Moon+'s own deleted-notes records with a
+     * multi-line (unescaped) note, {@code withNoteText(noteText())} gives a record that reads the same but no longer
+     * equals the parsed one, so a rewrite lays it out afresh instead of copying Moon+'s lines verbatim.
      */
     public MoonAnnotationRecord withNoteText(String newNoteText) {
         return withNote(encodeLineBreaks(Objects.requireNonNull(newNoteText, "newNoteText")));

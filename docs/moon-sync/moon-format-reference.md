@@ -168,9 +168,7 @@ checked against the app's own `notes` table; [decompiled] `BookDb.exportNotesToT
 
 - The note is **always field 11**, between bookmark (10) and original (12), empty or not. Records are read by
   position; readsync's "strip blank lines as padding" would move a real note into the text.
-- Export replaces `
-` with `<BR>` in **every** column; import turns every `<BR>` back into `
-`
+- Export replaces `\n` with `<BR>` in **every** column; import turns every `<BR>` back into `\n`
   (case-sensitive). There is no escape for a literal `<BR>`: typed into a note, it comes back as a line break.
 - Note text is stored exactly as the text box returns it, never trimmed. Every sample note and bookmark name
   ends with a space; it comes from the phone keyboard, not Moon+ (`PrefEditNote`). Accents, quotes, `#$*:`
@@ -180,8 +178,7 @@ checked against the app's own `notes` table; [decompiled] `BookDb.exportNotesToT
 - Deleted records write the note unescaped (real newlines), but import still decodes `<BR>`. Grimmory writes
   every note `<BR>`-encoded, deleted records included, so each record keeps Moon+'s fixed 16 lines;
   Moon+'s own multi-line deleted records are left verbatim while unchanged.
-- Grimmory treats `
-` and `` as line breaks when encoding (Moon+'s `readLine` would split on them).
+- Grimmory treats `\r\n` and `\r` as line breaks when encoding (Moon+'s `readLine` would split on them).
 
 In code: `MoonAnnotationRecord.noteText()` / `highlightedText()` decode, `withNoteText()` encodes; the raw
 `note()` / `text()` stay as stored.
