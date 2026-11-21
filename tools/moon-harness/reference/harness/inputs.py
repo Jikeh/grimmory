@@ -17,6 +17,11 @@ from pathlib import Path
 from typing import Any
 
 
+#: Where ``just harness run --save`` writes regression cases, relative to the default samples folder
+#: (``backend/src/test/resources/moonsync``). Never enumerated as samples.
+REGRESSIONS_DIR = "harness/regressions"
+
+
 @dataclass(frozen=True)
 class Roots:
     samples: Path
@@ -64,7 +69,11 @@ def files(roots: Roots, root_name: str, suffix: str) -> Iterator[Path]:
     root = roots.root(root_name)
     if not root.is_dir():
         return iter(())
-    return iter(sorted(p for p in root.rglob(f"*{suffix}") if p.is_file()))
+    # Saved regression cases live under the default samples folder; they are inputs already, not new samples.
+    return iter(sorted(
+        p for p in root.rglob(f"*{suffix}")
+        if p.is_file() and REGRESSIONS_DIR not in p.relative_to(root).parent.as_posix()
+    ))
 
 
 def device_captures(roots: Roots) -> Iterator[tuple[str, dict[str, Any]]]:

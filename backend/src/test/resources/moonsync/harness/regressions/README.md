@@ -1,6 +1,6 @@
 # Differential-harness regression cases
 
-Differences the Moon+ differential harness found against readsync, saved with `just harness run save=1`
+Differences the Moon+ differential harness found against readsync, saved with `just harness run --save`
 (see `tools/moon-harness/README.md`). One folder per comparison; each case is a `<slug>.json` holding the input,
 readsync's output as `expected` and the readsync revision, plus a copy of the input file when the input was a
 file. `MoonHarnessRegressionTest` runs every case in the normal test suite.

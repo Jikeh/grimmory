@@ -121,6 +121,13 @@ def test_write_reference_records_a_partial_selection(roots: Roots, tmp_path: Pat
     assert not (out / "reference" / "selection.txt").exists()
 
 
+def test_saved_regression_cases_are_not_samples(roots: Roots) -> None:
+    saved = roots.samples / "harness" / "regressions" / "po-roundtrip"
+    saved.mkdir(parents=True)
+    (saved / "case-1234.po").write_text("1*2@3#4:5.5%\n", encoding="utf-8")
+    assert not any("regressions" in case.id for case in po_roundtrip.cases(roots))
+
+
 def test_roots_refuse_unknown_root_names(roots: Roots) -> None:
     with pytest.raises(ValueError):
         roots.root("elsewhere")
