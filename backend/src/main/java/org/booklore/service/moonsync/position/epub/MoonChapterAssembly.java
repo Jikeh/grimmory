@@ -44,7 +44,8 @@ import java.util.stream.IntStream;
  * Each spine file contributes its {@code <body>} content ({@code T.getHtmlBody}).
  *
  * <p>Not ported, so reported as unsupported rather than guessed: books whose NCX Moon+ picks by file name
- * differently from the OPF (or reads where readsync can't, e.g. without its namespace), books Moon+ reads through an
+ * differently from the OPF (or reads where readsync can't, e.g. without its namespace), or reads differently
+ * ({@link EpubPackage#hasIrregularNcx()}), books Moon+ reads through an
  * EPUB 3 nav document instead of the NCX (no NCX, or an untrusted one, next to a declared nav), a one-navPoint NCX
  * over at most two spine files (Moon+ keeps it as its only chapter), and any chapter whose Moon+ number would differ
  * from readsync's: front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip or
@@ -265,6 +266,10 @@ public final class MoonChapterAssembly {
     private @Nullable String bookLevelDifference() {
         if (epub.moonReadsAnotherNcx()) {
             return "Moon+ picks its NCX by file name and would read another one than the OPF names";
+        }
+        if (epub.hasIrregularNcx()) {
+            return "the NCX has a shape Moon+ reads differently (a navPoint outside navPoint/navMap, a content "
+                    + "without src, or a %23 in a src)";
         }
         if (epub.ncxTrusted()) {
             return null;

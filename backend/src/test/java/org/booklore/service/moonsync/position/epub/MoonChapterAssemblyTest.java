@@ -318,6 +318,21 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void anNcxMoonReadsDifferentlyIsUnsupported() {
+        Map<String, String> files = files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"));
+        for (String odd : List.of(
+                "<pageList>" + np("9", "a.xhtml") + "</pageList>",           // navPoint outside navMap/navPoint
+                "<navPoint playOrder=\"9\"><content href=\"a.xhtml\"/></navPoint>", // content without src
+                np("9", "a%23x.xhtml"))) {                                     // %23 Moon+ decodes into an id
+            MoonChapterAssembly assembly = book(np("1", "a.xhtml") + odd + np("2", "b.xhtml"), files);
+            assertThat(assembly.unsupportedReason()).as(odd).hasValueSatisfying(r -> assertThat(r).contains("differently"));
+        }
+        assertThat(book(np("1", "a.xhtml") + np("2", "b%20c.xhtml#x"),
+                files("a.xhtml", body("<p>a</p>"), "b c.xhtml", body("<h2 id=\"x\">x</h2>"))).unsupportedReason())
+                .as("an encoded space is not a #").isEmpty();
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),

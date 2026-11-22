@@ -79,10 +79,11 @@ public final class EpubPackage {
     private final @Nullable String ncxEntry;
     private final @Nullable String moonNcx;
     private final int moonNavPoints;
+    private final boolean irregularNcx;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
                         boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry,
-                        @Nullable String moonNcx, int moonNavPoints) {
+                        @Nullable String moonNcx, int moonNavPoints, boolean irregularNcx) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
@@ -92,6 +93,7 @@ public final class EpubPackage {
         this.ncxEntry = ncxEntry;
         this.moonNcx = moonNcx;
         this.moonNavPoints = moonNavPoints;
+        this.irregularNcx = irregularNcx;
     }
 
     /**
@@ -107,12 +109,13 @@ public final class EpubPackage {
             List<String> spine = parseSpineHrefs(opf);
             String ncxHref = findNcxHref(opf);
             ZipEntry ncx = ncxHref == null ? null : findEntry(zip, resolveRelative(opfDir, ncxHref));
-            List<NavPoint> navPoints = ncx == null ? null : parseNavPoints(zip, ncx);
+            NcxRead read = ncx == null ? new NcxRead(null, false) : parseNavPoints(zip, ncx);
+            List<NavPoint> navPoints = read.navPoints();
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
             String moonNcx = moonNcxEntry(names);
             int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
             return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names,
-                    ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints);
+                    ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints, read.irregular());
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -209,6 +212,17 @@ public final class EpubPackage {
      */
     public int moonNcxNavPoints() {
         return moonNavPoints;
+    }
+
+    /**
+     * Whether the NCX has a shape Moon+'s {@code addNCXChapters} reads differently from readsync's walk: a navPoint
+     * nested in some other element (Moon+ only follows {@code navMap → navPoint → navPoint}), a navPoint with several
+     * {@code content}s or whose {@code content} has other attributes but no {@code src} (Moon+ falls back to them), or
+     * a {@code src}
+     * whose {@code %23} Moon+ decodes into a {@code #} before splitting off the id.
+     */
+    public boolean hasIrregularNcx() {
+        return irregularNcx;
     }
 
     /**
@@ -367,33 +381,48 @@ public final class EpubPackage {
         return null;
     }
 
-    private static @Nullable List<NavPoint> parseNavPoints(ZipFile zip, ZipEntry entry) throws IOException {
+    /** The navPoints (null without a usable NCX) and whether Moon+ would read the NCX differently. */
+    private record NcxRead(@Nullable List<NavPoint> navPoints, boolean irregular) {
+    }
+
+    private static NcxRead parseNavPoints(ZipFile zip, ZipEntry entry) throws IOException {
         Document ncx;
         try {
             ncx = parseXml(read(zip, entry));
         } catch (SAXException e) {
-            return null;
+            return new NcxRead(null, false);
         }
         Element navMap = firstChild(ncx.getDocumentElement(), NCX_NS, "navMap");
         if (navMap == null) {
-            return null;
+            return new NcxRead(null, false);
         }
         List<NavPoint> entries = new ArrayList<>();
+        boolean irregular = false;
         for (Element navPoint : descendants(navMap, NCX_NS, "navPoint")) {
+            Node parent = navPoint.getParentNode();
+            irregular |= parent != navMap && !is(parent, NCX_NS, "navPoint");
             Element content = firstChild(navPoint, NCX_NS, "content");
             String src = content == null ? null : attribute(content, "src");
+            // getCFilename falls back to the last other attribute, and addNCXChapters to a later content element.
+            irregular |= children(navPoint, NCX_NS, "content").size() > 1;
             if (src == null || src.isEmpty()) {
+                irregular |= content != null && content.getAttributes().getLength() > (src == null ? 0 : 1);
                 continue;
             }
+            irregular |= percentDecode(src).chars().filter(c -> c == '#').count() != src.chars().filter(c -> c == '#').count();
             int hash = src.indexOf('#');
             String href = hash < 0 ? src : src.substring(0, hash);
             String fragment = hash < 0 || hash == src.length() - 1 ? null : src.substring(hash + 1);
             String label = moonLabel(navPoint);
             entries.add(new NavPoint(pythonInt(attribute(navPoint, "playOrder")), href, fragment,
-                    depth(navPoint, navMap), label == null ? "" : label.replace("\n", "").replace("\r", "").trim(),
-                    hash == src.length() - 1, label == null));
+                    depth(navPoint, navMap), normalizedLabel(label), hash == src.length() - 1, label == null));
         }
-        return entries.isEmpty() ? null : List.copyOf(entries);
+        return new NcxRead(entries.isEmpty() ? null : List.copyOf(entries), irregular);
+    }
+
+    /** {@code Epub.getChapter}'s label: line breaks removed, trimmed; {@code ""} for none. */
+    private static String normalizedLabel(@Nullable String label) {
+        return label == null ? "" : label.replace("\n", "").replace("\r", "").trim();
     }
 
     /**
