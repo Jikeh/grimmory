@@ -70,6 +70,13 @@ public final class MoonChapterAssembly {
     private static final int OUTSIDE_SPINE = -1;
     /** {@code Epub.getMaxHtmlSize} for EPUB: below it, Moon+ preloads ID chapters and drops broken ones. */
     private static final long PRELOAD_MAX_BOOK_SIZE = 1_000_000;
+    private static final int PRELOAD_MAX_CHAPTERS = 60;
+    /** An anchor this far into a new file's body leaves the head before it to the previous chapter. */
+    private static final int FAR_INTO_BODY = 500;
+    private static final int FAR_INTO_SHORT_BODY = 100;
+    /** {@code getTextBeforeTag}'s minimum text for a head handed to the previous chapter, and for chapter 0. */
+    private static final int HEAD_MIN_TEXT = 20;
+    private static final int FRONT_HEAD_MIN_TEXT = 40;
     private static final int TEXT_BEFORE_TAG_RAW = 80;
 
     private final EpubPackage epub;
@@ -174,6 +181,9 @@ public final class MoonChapterAssembly {
             return null;
         }
         List<NavPoint> navPoints = epub.navPoints().orElseThrow();
+        if (epub.hasEmptyNavPointFragment()) {
+            return "a navPoint ends in an empty '#': Moon+ reads it as an empty id, readsync as no fragment";
+        }
         int leading = MoonChapterMap.leadingOffset(epub, navPoints.getFirst());
         boolean treeToc = false;
         boolean hasIdStr = false;
@@ -183,12 +193,18 @@ public final class MoonChapterAssembly {
             hasIdStr |= navPoint.fragment() != null;
             OptionalInt spineIndex = epub.ncxSpineIndex(navPoint.href());
             if (spineIndex.isPresent() || epub.containsFile(navPoint.href())) {
-                list.add(new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), navPoint.fragment(),
+                // Moon+ decodes the whole content/@src (Uri.decode) before splitting off the id.
+                String fragment = navPoint.fragment() == null ? null : EpubPackage.percentDecode(navPoint.fragment());
+                list.add(new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), fragment,
                         navPoint.depth(), navPoint.label()));
             }
         }
         if (list.stream().allMatch(c -> c.spineIndex == OUTSIDE_SPINE)) {
             return "no navPoint resolves to a spine file";
+        }
+        if (list.size() < 2) {
+            // getChaptersFromOpf: with fewer than 2 NCX chapters found, Moon+ reads the spine (or keeps the one chapter).
+            return "only one navPoint resolves: Moon+ numbers this book's chapters by the spine, readsync by the NCX";
         }
         if (treeToc) {
             for (int i = 0; i < list.size() - 1; i++) {
@@ -202,6 +218,7 @@ public final class MoonChapterAssembly {
             inserted = true;
         }
         int firstChapterPos = inserted ? 1 : 0;
+        int headChapter = 0; // 1 once recheckChapters prepends the head before the first anchor
         if (hasIdStr && list.size() > firstChapterPos) {
             MappedHtml head = contentBeforeFirstTag(list.get(firstChapterPos));
             if (head != null) {
@@ -210,6 +227,7 @@ public final class MoonChapterAssembly {
                     front.direct = head;
                     list.addFirst(front);
                     inserted = true;
+                    headChapter = 1;
                 } else {
                     list.getFirst().direct.appendSynthetic(PAGE_BREAK).append(head);
                 }
@@ -222,9 +240,11 @@ public final class MoonChapterAssembly {
         }
         try {
             assignFoundIds(list);
-            if (hasIdStr && list.size() < 60 && epub.fileSize() < PRELOAD_MAX_BOOK_SIZE) {
-                long broken = IntStream.range(0, list.size()).filter(i -> isBroken(list, i)).count();
-                if (broken > 2 && broken < list.size()) {
+            // recheckChapters preloads and drops broken chapters before it prepends the head chapter.
+            List<Chapter> preloaded = list.subList(headChapter, list.size());
+            if (hasIdStr && preloaded.size() < PRELOAD_MAX_CHAPTERS && epub.fileSize() < PRELOAD_MAX_BOOK_SIZE) {
+                long broken = IntStream.range(0, preloaded.size()).filter(i -> isBroken(preloaded, i)).count();
+                if (broken > 2 && broken < preloaded.size()) {
                     return "Moon+ drops " + broken + " chapters whose anchors it can't find (deleteBrokenChapters), "
                             + "renumbering the rest";
                 }
@@ -349,7 +369,7 @@ public final class MoonChapterAssembly {
         if (idPos <= 100) {
             return null;
         }
-        return textBeforeTag(file, idPos, 40);
+        return textBeforeTag(file, idPos, FRONT_HEAD_MIN_TEXT);
     }
 
     // ---- One chapter's text (getChapterText, getChapterTextWithIDTag, getMoreContentFromNextID_Tag) ----
@@ -461,8 +481,7 @@ public final class MoonChapterAssembly {
         Chapter chapter = list.get(i);
         int idPos = chapter.fragment == null ? 0 : idPosition(file, chapter.fragment);
         if (idPos > 0 && i > 0 && list.get(i - 1).spineIndex != chapter.spineIndex) {
-            boolean far = idPos > 500 || (idPos > 100 && idPos > file.body().length() / 4);
-            if (!far || textBeforeTag(file, idPos, 20) == null) {
+            if (!farIntoBody(idPos, file.body().length()) || textBeforeTag(file, idPos, HEAD_MIN_TEXT) == null) {
                 idPos = 0;
             }
         }
@@ -509,8 +528,8 @@ public final class MoonChapterAssembly {
         int idPos = idPosition(file, chapter.fragment);
         String text = file.body();
         if (idPos > 0 && j > 0 && chapters.get(j - 1).spineIndex != chapter.spineIndex
-                && (idPos > 500 || (idPos > 100 && idPos > text.length() / 4))) {
-            return textBeforeTag(file, idPos, 20);
+                && farIntoBody(idPos, text.length())) {
+            return textBeforeTag(file, idPos, HEAD_MIN_TEXT);
         }
         return null;
     }
@@ -614,9 +633,13 @@ public final class MoonChapterAssembly {
         return new MappedHtml().appendSource(spineIndex, file.full, file.bodyStart + from, file.bodyStart + to);
     }
 
+    private static boolean farIntoBody(int idPos, int bodyLength) {
+        return idPos > FAR_INTO_BODY || (idPos > FAR_INTO_SHORT_BODY && idPos > bodyLength / 4);
+    }
+
     /** Approximates Moon+'s {@code T.html2Text} / {@code Html.fromHtml} text, used only for its emptiness thresholds. */
     private static String plainText(String html) {
-        return Jsoup.parseBodyFragment(html).text().strip();
+        return Jsoup.parseBodyFragment(html).text();
     }
 
     // ---- Files ----

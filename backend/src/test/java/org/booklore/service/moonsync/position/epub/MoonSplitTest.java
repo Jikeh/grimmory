@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * The raw chunk boundaries (readsync {@code moon_split.js}); the rendered side of the split map and the full port of
- * the bridge's split tests belong to ticket 05.
+ * the bridge's split tests belong with the rendered-offset work.
  */
 class MoonSplitTest {
 

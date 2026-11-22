@@ -36,14 +36,14 @@ final class EpubChapterMapComparison implements HarnessComparison {
                 Optional<MoonChapterMap.SpineAnchor> relaxedAnchor = map.resolveChapter(c, true);
                 relaxedAnchor.ifPresent(relaxed::add);
                 ObjectNode chapter = chapters.addObject();
-                chapter.set("strict", pair(strictAnchor.map(a -> new int[]{a.spineIndex(), a.anchorOffset()})));
-                chapter.set("relaxed", pair(relaxedAnchor.map(a -> new int[]{a.spineIndex(), a.anchorOffset()})));
+                chapter.set("strict", strictAnchor.map(a -> pair(a.spineIndex(), a.anchorOffset())).orElse(NULL));
+                chapter.set("relaxed", relaxedAnchor.map(a -> pair(a.spineIndex(), a.anchorOffset())).orElse(NULL));
             }
             ArrayNode reverse = out.putArray("reverse");
             TreeMap<Integer, TreeSet<Integer>> probes = probes(epub.spineLength(), relaxed);
             probes.forEach((spine, offsets) -> offsets.forEach(offset -> {
                 ObjectNode probe = reverse.addObject().put("spine", spine).put("offset", offset);
-                probe.set("result", pair(map.resolveSpinePosition(spine, offset).map(a -> new int[]{a.chapter(), a.anchorOffset()})));
+                probe.set("result", map.resolveSpinePosition(spine, offset).map(a -> pair(a.chapter(), a.anchorOffset())).orElse(NULL));
             }));
         });
     }
@@ -67,8 +67,9 @@ final class EpubChapterMapComparison implements HarnessComparison {
         return probes;
     }
 
-    private static JsonNode pair(Optional<int[]> value) {
-        return value.<JsonNode>map(v -> JsonNodeFactory.instance.arrayNode().add(v[0]).add(v[1]))
-                .orElse(JsonNodeFactory.instance.nullNode());
+    private static final JsonNode NULL = JsonNodeFactory.instance.nullNode();
+
+    private static JsonNode pair(int first, int second) {
+        return JsonNodeFactory.instance.arrayNode().add(first).add(second);
     }
 }

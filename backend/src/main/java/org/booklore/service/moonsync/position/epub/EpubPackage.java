@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.regex.Matcher;
@@ -73,15 +74,17 @@ public final class EpubPackage {
     private final @Nullable List<NavPoint> navPoints;
     private final boolean epub3Nav;
     private final List<String> entryNames;
+    private final boolean emptyFragment;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
-                        boolean epub3Nav, List<String> entryNames) {
+                        boolean epub3Nav, List<String> entryNames, boolean emptyFragment) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
         this.navPoints = navPoints;
         this.epub3Nav = epub3Nav;
         this.entryNames = entryNames;
+        this.emptyFragment = emptyFragment;
     }
 
     /**
@@ -97,7 +100,8 @@ public final class EpubPackage {
             List<String> spine = parseSpineHrefs(opf);
             List<NavPoint> navPoints = parseNavPoints(zip, opf, opfDir);
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
-            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names);
+            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names,
+                    hasEmptyFragment(zip, opf, opfDir));
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -176,6 +180,14 @@ public final class EpubPackage {
      */
     public boolean declaresNavDocument() {
         return epub3Nav;
+    }
+
+    /**
+     * Whether a navPoint's {@code content/@src} ends in a bare {@code #}: readsync (and {@link NavPoint#fragment()})
+     * read it as no fragment, Moon+ as an empty id.
+     */
+    public boolean hasEmptyNavPointFragment() {
+        return emptyFragment;
     }
 
     /** The EPUB file's size in bytes (Moon+ decides some chapter handling by it). */
@@ -351,6 +363,23 @@ public final class EpubPackage {
         Node first = text == null ? null : text.getFirstChild();
         String value = first == null || first.getNodeValue() == null ? "" : first.getNodeValue();
         return value.replace("\n", "").replace("\r", "").trim();
+    }
+
+    private static boolean hasEmptyFragment(ZipFile zip, Document opf, String opfDir) throws IOException {
+        String ncxHref = findNcxHref(opf);
+        if (ncxHref == null) {
+            return false;
+        }
+        try {
+            Element navMap = firstChild(parseXml(readEntry(zip, resolveRelative(opfDir, ncxHref))).getDocumentElement(), NCX_NS, "navMap");
+            return navMap != null && descendants(navMap, NCX_NS, "navPoint").stream()
+                    .map(n -> firstChild(n, NCX_NS, "content"))
+                    .filter(Objects::nonNull)
+                    .map(c -> c.getAttribute("src"))
+                    .anyMatch(src -> src.indexOf('#') == src.length() - 1);
+        } catch (MissingEntryException | SAXException e) {
+            return false;
+        }
     }
 
     private static @Nullable BigInteger pythonInt(@Nullable String value) {

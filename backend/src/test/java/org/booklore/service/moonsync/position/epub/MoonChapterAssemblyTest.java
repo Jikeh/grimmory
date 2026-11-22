@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assumptions.assumeThat;
 
 /**
  * Moon+'s chapter assembly: synthetic books for each rule of {@code Epub.getChaptersFromOpf} /
- * {@code getChapterTextWithIDTag} (decompiled 10.8), and the device fixtures (ticket 00b) for what Moon+ actually
+ * {@code getChapterTextWithIDTag} (decompiled 10.8), and the device fixtures (Moon+ on a real phone) for what Moon+ actually
  * showed: every probe's highlighted text must be in its chapter's split chunk, at about its captured offset.
  */
 class MoonChapterAssemblyTest {
@@ -28,7 +28,7 @@ class MoonChapterAssemblyTest {
     /**
      * How far a plain tag-strip's offset may be from Moon+'s: at least 40 characters, or an eighth of the offset. The
      * strip counts paragraph breaks, images and {@code &nbsp;} lines differently from Moon+'s renderer (exact counting
-     * is ticket 05); the worst case is Ulysses XV's table-set play script, where it runs ~11% short by the end of a
+     * belongs to the Moon+ renderer port); the worst case is Ulysses XV's table-set play script, where it runs ~11% short by the end of a
      * chunk. This checks the chapter and chunk assembly, not the counting.
      */
     private static int tolerance(int position) {
@@ -238,6 +238,29 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void anIdIsLookedUpPercentDecodedAsMoonDecodesTheWholeSrc() {
+        MoonChapterAssembly assembly = book(np("1", "a.xhtml") + np("2", "a.xhtml#a%20b"),
+                files("a.xhtml", body("<p>one</p><h2 id=\"a b\">two</h2>")));
+        assertThat(html(assembly, 0)).isEqualTo("<p>one</p>");
+        assertThat(html(assembly, 1)).isEqualTo("<h2 id=\"a b\">two</h2>");
+    }
+
+    @Test
+    void anNcxWithOnlyOneResolvingNavPointIsUnsupported() {
+        // Moon+ then numbers chapters by the spine (getChaptersFromOpf: fewer than 2 NCX chapters).
+        MoonChapterAssembly assembly = book(np("1", "a.xhtml") + np("2", "gone.xhtml") + np("3", "lost.xhtml"),
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"), "c.xhtml", body("<p>c</p>")));
+        assertThat(assembly.unsupportedReason()).isPresent();
+    }
+
+    @Test
+    void aNavPointEndingInABareHashIsUnsupported() {
+        MoonChapterAssembly assembly = book(np("1", "a.xhtml#") + np("2", "b.xhtml"),
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>")));
+        assertThat(assembly.unsupportedReason()).hasValueSatisfying(r -> assertThat(r).contains("empty"));
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),
@@ -245,7 +268,7 @@ class MoonChapterAssemblyTest {
         assertThat(MoonChapterAssembly.of(EpubPackage.read(book)).unsupportedReason()).isPresent();
     }
 
-    // --- Device fixtures (ticket 00b) ---
+    // --- Device fixtures (Moon+ 10.8 on a real phone) ---
 
     @ParameterizedTest
     @ValueSource(strings = {"pride-and-prejudice", "ulysses", "pinocchio"})

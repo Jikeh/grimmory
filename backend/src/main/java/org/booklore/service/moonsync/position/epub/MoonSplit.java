@@ -8,7 +8,7 @@ import java.util.Locale;
  * Where Moon+ cuts an oversized chapter into chunks (the {@code split} of a {@code .po}): the raw-HTML boundaries of
  * readsync's {@code cfi_bridge/lib/moon_split.js} ({@code splitRawHtmlBoundaries}), ported as is so the chunk count
  * the chapter map relies on matches readsync. Rendered chunk lengths, and the checks against Moon+'s own
- * {@code A.createSplitHtmls}, belong to the offset work (ticket 05).
+ * {@code A.createSplitHtmls}, belong to the rendered-offset work.
  *
  * <p>The rule: once the {@code <body>} content, plus the {@code <div …>} tag carried over from the previous chunk, is
  * longer than {@value #SPLIT_TRIGGER} characters, cut at the first {@code <p} or {@code <div} at or after
