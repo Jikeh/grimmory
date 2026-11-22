@@ -189,7 +189,8 @@ public final class MoonChapterAssembly {
         for (int position = 0; position < navPoints.size(); position++) {
             NavPoint navPoint = navPoints.get(position);
             treeToc |= navPoint.depth() > 0;
-            hasIdStr |= navPoint.fragment() != null;
+            // getChapter sets has_id_str for a named navPoint whose src has a '#', before it looks for the file.
+            hasIdStr |= (navPoint.fragment() != null || navPoint.bareHash()) && !navPoint.labelless();
             OptionalInt spineIndex = epub.ncxSpineIndex(navPoint.href());
             if (spineIndex.isPresent() || epub.containsFile(navPoint.href())) {
                 if (navPoint.bareHash()) {
@@ -697,7 +698,7 @@ public final class MoonChapterAssembly {
             return Optional.empty();
         }
         String path = EpubPackage.percentDecode(epub.spinePath(spineIndex));
-        String name = path.substring(path.lastIndexOf('/') + 1);
+        String name = EpubPackage.baseName(path);
         BodyRange body = htmlBody(full);
         return Optional.of(new FileText(spineIndex, name, full, body));
     }

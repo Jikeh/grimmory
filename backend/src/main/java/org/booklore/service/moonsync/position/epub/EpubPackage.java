@@ -64,9 +64,9 @@ public final class EpubPackage {
     private static final String NCX_NS = "http://www.daisy.org/z3986/2005/ncx/";
     private static final String NCX_MEDIA_TYPE = "application/x-dtbncx+xml";
     private static final Charset ZIP_NAME_FALLBACK = Charset.forName("IBM437");
-    /** Python's {@code int()}: optional surrounding whitespace and sign, decimal digits, single underscores between. */
     /** A {@code navPoint} start tag, with or without a prefix, in lower-cased text. */
     private static final Pattern NAV_POINT_TAG = Pattern.compile("<(?:[a-z0-9_.-]+:)?navpoint[\\s>/]");
+    /** Python's {@code int()}: optional surrounding whitespace and sign, decimal digits, single underscores between. */
     private static final Pattern PYTHON_INT = Pattern.compile("([+-]?)(\\p{Nd}+(?:_\\p{Nd}+)*)");
     private static final DocumentBuilderFactory XML = xmlFactory();
 
@@ -237,7 +237,8 @@ public final class EpubPackage {
         return (int) NAV_POINT_TAG.matcher(text).results().count();
     }
 
-    private static String baseName(String path) {
+    /** The part after the last {@code /} ({@code T.getFilename}). */
+    static String baseName(String path) {
         return path.substring(path.lastIndexOf('/') + 1);
     }
 
@@ -256,7 +257,7 @@ public final class EpubPackage {
      */
     public boolean containsFile(String href) {
         String decoded = percentDecode(href);
-        String name = decoded.substring(decoded.lastIndexOf('/') + 1);
+        String name = baseName(decoded);
         return !name.isEmpty() && entryNames.stream().anyMatch(e -> e.equals(name) || e.endsWith("/" + name));
     }
 
@@ -387,21 +388,34 @@ public final class EpubPackage {
             int hash = src.indexOf('#');
             String href = hash < 0 ? src : src.substring(0, hash);
             String fragment = hash < 0 || hash == src.length() - 1 ? null : src.substring(hash + 1);
+            String label = moonLabel(navPoint);
             entries.add(new NavPoint(pythonInt(attribute(navPoint, "playOrder")), href, fragment,
-                    depth(navPoint, navMap), label(navPoint), hash == src.length() - 1, labelless(navPoint)));
+                    depth(navPoint, navMap), label == null ? "" : label.replace("\n", "").replace("\r", "").trim(),
+                    hash == src.length() - 1, label == null));
         }
         return entries.isEmpty() ? null : List.copyOf(entries);
     }
 
-    /** Moon+'s {@code getCName} returning null: a {@code navLabel} without a {@code text} that starts with text. */
-    private static boolean labelless(Element navPoint) {
-        Element navLabel = firstChild(navPoint, NCX_NS, "navLabel");
-        if (navLabel == null) {
-            return false;
+    /**
+     * Moon+'s label for a navPoint ({@code addNCXChapters}, {@code getCName}): {@code ""} without a {@code navLabel};
+     * else, from the first {@code navLabel} that gives one, the value of the first child of its first {@code text}
+     * that has a child. Null when every {@code navLabel} gives none: Moon+ then skips the navPoint.
+     */
+    private static @Nullable String moonLabel(Element navPoint) {
+        String name = "";
+        for (Element navLabel : children(navPoint, NCX_NS, "navLabel")) {
+            if (name != null && !name.isEmpty()) {
+                break;
+            }
+            name = null;
+            for (Element text : children(navLabel, NCX_NS, "text")) {
+                if (text.getFirstChild() != null) {
+                    name = text.getFirstChild().getNodeValue();
+                    break;
+                }
+            }
         }
-        Element text = firstChild(navLabel, NCX_NS, "text");
-        Node first = text == null ? null : text.getFirstChild();
-        return first == null || first.getNodeValue() == null;
+        return name;
     }
 
     private static int depth(Element navPoint, Element navMap) {
@@ -412,15 +426,6 @@ public final class EpubPackage {
             }
         }
         return depth;
-    }
-
-    /** Moon+'s {@code Epub.getCName}: the first {@code navLabel}'s {@code text} child's first text. */
-    private static String label(Element navPoint) {
-        Element navLabel = firstChild(navPoint, NCX_NS, "navLabel");
-        Element text = navLabel == null ? null : firstChild(navLabel, NCX_NS, "text");
-        Node first = text == null ? null : text.getFirstChild();
-        String value = first == null || first.getNodeValue() == null ? "" : first.getNodeValue();
-        return value.replace("\n", "").replace("\r", "").trim();
     }
 
     private static @Nullable BigInteger pythonInt(@Nullable String value) {

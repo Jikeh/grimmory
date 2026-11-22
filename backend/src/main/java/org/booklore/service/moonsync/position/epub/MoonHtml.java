@@ -8,6 +8,7 @@ import org.jsoup.nodes.Range;
 import org.jsoup.nodes.TextNode;
 import org.jsoup.parser.Parser;
 import org.jsoup.select.NodeTraversor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -54,11 +55,15 @@ public final class MoonHtml {
             "</html[\\t\\n\\f ]*>((?:[\\t\\n\\f ]|<!--.*?-->)*)\\z", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
 
-    private MoonHtml() {
-    }
-
     /** Stands in for the text after {@code </body>} while jsoup parses; private-use characters, never in a book. */
     private static final String SENTINEL = "\uE000moon-after-body\uE000";
+
+    private static final Pattern END_TAGS = Pattern.compile("</(?:body|html)[\\t\\n\\f ]*>", Pattern.CASE_INSENSITIVE);
+
+    private static final Set<String> TABLE_CONTEXT = Set.of("table", "tbody", "thead", "tfoot", "tr");
+
+    private MoonHtml() {
+    }
 
     public static Document parse(String html) {
         String normalized = normalizeNewlines(html);
@@ -150,7 +155,7 @@ public final class MoonHtml {
      * The text after the end tag at {@code end} when nothing but text, comments and {@code </body>}/{@code </html>} end
      * tags follow it (character references decoded), or {@code null} when other markup does.
      */
-    private static String textAfter(String source, int end) {
+    private static @Nullable String textAfter(String source, int end) {
         int gt = source.indexOf('>', end);
         if (gt < 0) {
             return null;
@@ -158,8 +163,6 @@ public final class MoonHtml {
         String rest = END_TAGS.matcher(COMMENT.matcher(source.substring(gt + 1)).replaceAll("")).replaceAll("");
         return rest.indexOf('<') >= 0 ? null : Parser.unescapeEntities(rest, false);
     }
-
-    private static final Pattern END_TAGS = Pattern.compile("</(?:body|html)[\\t\\n\\f ]*>", Pattern.CASE_INSENSITIVE);
 
     private static boolean insideText(Document document, int position) {
         boolean[] inside = {false};
@@ -209,8 +212,6 @@ public final class MoonHtml {
             }
         }
     }
-
-    private static final Set<String> TABLE_CONTEXT = Set.of("table", "tbody", "thead", "tfoot", "tr");
 
     private static boolean closedInSource(Element element) {
         Range end = element.endSourceRange();

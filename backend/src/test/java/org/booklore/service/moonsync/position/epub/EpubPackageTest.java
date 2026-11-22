@@ -139,6 +139,18 @@ class EpubPackageTest {
     }
 
     @Test
+    void labelsAreReadAsMoonReadsThem() {
+        String ncx = TestEpubs.ncx(
+                "<navPoint playOrder=\"1\"><navLabel><text/><text>Second text</text></navLabel><content src=\"a.xhtml\"/></navPoint>"
+                + "<navPoint playOrder=\"2\"><navLabel><text/></navLabel><navLabel><text>Later label</text></navLabel><content src=\"a.xhtml\"/></navPoint>"
+                + "<navPoint playOrder=\"3\"><navLabel><text/></navLabel><content src=\"a.xhtml\"/></navPoint>"
+                + "<navPoint playOrder=\"4\"><content src=\"a.xhtml\"/></navPoint>");
+        List<NavPoint> navPoints = EpubPackage.read(bookWithNcx(ncx)).navPoints().orElseThrow();
+        assertThat(navPoints).extracting(NavPoint::label).containsExactly("Second text", "Later label", "", "");
+        assertThat(navPoints).extracting(NavPoint::labelless).containsExactly(false, false, true, false);
+    }
+
+    @Test
     void ncxIsFoundThroughTheSpineTocAttribute() {
         assertThat(EpubPackage.read(bookWithNcx(TOC_NCX)).navPoints()).hasValueSatisfying(n -> assertThat(n).hasSize(3));
     }
