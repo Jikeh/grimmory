@@ -232,10 +232,16 @@ class EpubPackageTest {
     }
 
     @Test
-    void anEpub3NavDocumentIsReported() {
-        String opf = TestEpubs.opf(false, "nav.xhtml").replace("media-type=\"application/xhtml+xml\"/>",
-                "media-type=\"application/xhtml+xml\" properties=\"scripted nav\"/>");
-        assertThat(EpubPackage.read(TestEpubs.epub(dir, opf, null, Map.of())).declaresNavDocument()).isTrue();
+    void anEpub3NavDocumentIsFoundAsMoonFindsIt() {
+        // Epub.getTocFilenameEpub3 looks for the literal properties="nav", then that tag's href in the zip.
+        Map<String, String> nav = Map.of("nav.xhtml", "<html><body><nav><ol/></nav></body></html>");
+        String opf = TestEpubs.opf(false, "nav.xhtml");
+        assertThat(EpubPackage.read(TestEpubs.epub(dir, opf.replace("xml\"/>", "xml\" properties=\"nav\"/>"), null, nav))
+                .declaresNavDocument()).isTrue();
+        assertThat(EpubPackage.read(TestEpubs.epub(dir, opf.replace("xml\"/>", "xml\" properties=\"scripted nav\"/>"), null, nav))
+                .declaresNavDocument()).as("not the literal text").isFalse();
+        assertThat(EpubPackage.read(TestEpubs.epub(dir, opf.replace("xml\"/>", "xml\" properties=\"nav\"/>"), null, Map.of()))
+                .declaresNavDocument()).as("no such file").isFalse();
         assertThat(EpubPackage.read(plainBook()).declaresNavDocument()).isFalse();
     }
 

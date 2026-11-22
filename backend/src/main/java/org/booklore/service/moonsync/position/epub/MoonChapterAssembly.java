@@ -152,8 +152,8 @@ public final class MoonChapterAssembly {
         final int number;
         final int spineIndex;
         @Nullable String fragment;
-        final int depth;
-        final String label;
+        int depth;
+        String label;
         boolean hasSubChapter;
         final Set<Integer> usedFiles = new HashSet<>();
         /** Files appended eagerly ({@code additionalText}), in order. */
@@ -214,11 +214,18 @@ public final class MoonChapterAssembly {
         if (list.stream().allMatch(c -> c.spineIndex == OUTSIDE_SPINE)) {
             return "no navPoint resolves to a spine file";
         }
-        List<String> ncxEntries = list.stream().map(c -> c.tocEntry).toList();
-        List<String> nav = epub.navTocEntries();
-        if (nav.size() >= ncxEntries.size() && !nav.equals(ncxEntries)) {
-            // getChapters: Moon+ re-reads the chapter list from the nav and keeps it unless it is shorter.
-            return "Moon+ numbers this book by its EPUB 3 nav, whose entries differ from the NCX's";
+        // getChapters: Moon+ re-reads the chapter list from the nav and keeps it unless it is shorter. Only the same
+        // entries are supported; then the chapters take the nav's labels and nesting.
+        List<EpubPackage.NavTocEntry> nav = epub.navTocEntries();
+        if (nav.size() >= list.size()) {
+            if (!nav.stream().map(EpubPackage.NavTocEntry::target).toList().equals(list.stream().map(c -> c.tocEntry).toList())) {
+                return "Moon+ numbers this book by its EPUB 3 nav, whose entries differ from the NCX's";
+            }
+            for (int i = 0; i < list.size(); i++) {
+                list.get(i).depth = nav.get(i).depth();
+                list.get(i).label = nav.get(i).label();
+                treeToc |= nav.get(i).depth() > 0; // addEpub3NCXChapters sets treeTOC; the NCX's stays set too
+            }
         }
         if (list.size() < 2) {
             // getChaptersFromOpf: with fewer than 2 NCX chapters found, Moon+ reads the spine (or keeps the one chapter).

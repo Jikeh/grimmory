@@ -355,6 +355,19 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void whenMoonTakesTheNavItTakesItsLabels() {
+        // Same entries as the NCX, so Moon+'s chapters come from the nav: an empty chapter shows the nav's label.
+        String opf = TestEpubs.opf(true, "a.xhtml", "b.xhtml").replace("</manifest>",
+                "<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/></manifest>");
+        String nav = "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><nav><ol><li><a href=\"a.xhtml\">One</a></li>"
+                + "<li><a href=\"a.xhtml#p2\">Nav two</a></li><li><a href=\"b.xhtml\">B</a></li></ol></nav></body></html>";
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir, opf,
+                TestEpubs.ncx(np("1", "a.xhtml") + np("2", "a.xhtml#p2") + np("3", "b.xhtml")),
+                files("a.xhtml", body("<p>one</p><span id=\"p2\"></span>"), "b.xhtml", body("<p>b</p>"), "nav.xhtml", nav))));
+        assertThat(html(assembly, 1)).isEqualTo("<center><h2>Nav two</h2></center>");
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),

@@ -81,12 +81,12 @@ public final class EpubPackage {
     private final @Nullable String moonNcx;
     private final int moonNavPoints;
     private final boolean irregularNcx;
-    private final List<String> navTocEntries;
+    private final List<NavTocEntry> navTocEntries;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
                         boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry,
                         @Nullable String moonNcx, int moonNavPoints, boolean irregularNcx,
-                        List<String> navTocEntries) {
+                        List<NavTocEntry> navTocEntries) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
@@ -109,18 +109,20 @@ public final class EpubPackage {
         try (ZipFile zip = open(file)) {
             String opfPath = findOpfPath(zip);
             String opfDir = dirname(opfPath);
-            Document opf = parseXml(readEntry(zip, opfPath));
+            byte[] opfBytes = readEntry(zip, opfPath);
+            Document opf = parseXml(opfBytes);
             List<String> spine = parseSpineHrefs(opf);
             String ncxHref = findNcxHref(opf);
             ZipEntry ncx = ncxHref == null ? null : findEntry(zip, resolveRelative(opfDir, ncxHref));
             NcxRead read = ncx == null ? new NcxRead(null, false) : readNcx(zip, ncx);
             List<NavPoint> navPoints = read.navPoints();
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
+            ZipEntry navEntry = moonNavEntry(zip, new String(opfBytes, StandardCharsets.UTF_8), opfDir, names);
             String moonNcx = moonNcxEntry(names);
             int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
-            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names,
+            return new EpubPackage(file, opfDir, spine, navPoints, navEntry != null, names,
                     ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints, read.irregular(),
-                    navTocEntries(zip, opf, opfDir));
+                    navEntry == null ? List.of() : navTocEntries(zip, navEntry, names));
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -193,9 +195,10 @@ public final class EpubPackage {
     }
 
     /**
-     * Whether the package declares an EPUB 3 navigation document ({@code properties="nav"}). Moon+ reads its chapter
-     * list from that document when it has no NCX, or when the nav lists at least as many entries as the NCX
-     * ({@code Epub.getChapters}); readsync, and so this port, reads the NCX only.
+     * Whether Moon+ finds an EPUB 3 navigation document ({@code Epub.getTocFilenameEpub3}: the literal text
+     * {@code properties="nav"} in the package document, that tag's {@code href}, a file in the zip). Moon+ reads its
+     * chapter list from it when there is no NCX, or when the nav lists at least as many entries as the NCX
+     * ({@code Epub.getChapters}); readsync, and so {@link #navPoints()}, reads the NCX only.
      */
     public boolean declaresNavDocument() {
         return epub3Nav;
@@ -223,43 +226,64 @@ public final class EpubPackage {
      * Whether the NCX has a shape Moon+'s {@code addNCXChapters} reads differently from readsync's walk: a navPoint
      * nested in some other element (Moon+ only follows {@code navMap → navPoint → navPoint}), a navPoint with several
      * {@code content}s or whose {@code content} has other attributes but no {@code src} (Moon+ falls back to them),
-     * or a {@code src}
-     * whose {@code %23} Moon+ decodes into a {@code #} before splitting off the id.
+     * or a {@code src} whose {@code %23} Moon+ decodes into a {@code #} before splitting off the id.
      */
     public boolean hasIrregularNcx() {
         return irregularNcx;
     }
 
     /**
-     * The EPUB 3 nav document's table of contents as Moon+ reads it ({@code Epub.getChaptersFromToc} for a nav,
-     * {@code addEpub3NCXChapters}), each entry {@code file#fragment} (base name, percent-decoded; {@code #} with an
-     * empty fragment when there is none): the {@code nav} whose {@code epub:type} has {@code toc} (the first when there
-     * is only one), its {@code ol}/{@code li}/{@code a} tree in document order, entries whose file is in the zip and
-     * whose {@code a} has no children or starts with text. Empty without a readable nav document.
+     * One table-of-contents entry of the EPUB 3 nav as Moon+ reads it.
+     *
+     * @param target {@link #tocEntry}'s {@code file#fragment}
+     * @param depth  how many {@code ol}s it is nested in below the top one
+     * @param label  the first child of its {@code a} (or {@code ""}), line breaks removed and trimmed
      */
-    public List<String> navTocEntries() {
+    public record NavTocEntry(String target, int depth, String label) {
+    }
+
+    /**
+     * The EPUB 3 nav document's table of contents as Moon+ reads it ({@code Epub.getChaptersFromToc} for a nav,
+     * {@code addEpub3NCXChapters}): the {@code nav} whose {@code epub:type} has {@code toc} (the first when there is
+     * only one, or when a {@code nav} before it has no {@code epub:type}), its {@code ol}/{@code li}/{@code a} tree in
+     * document order, entries whose file is in the zip and whose {@code a} has no children or starts with text. Empty
+     * without a nav document Moon+ finds and can parse.
+     */
+    public List<NavTocEntry> navTocEntries() {
         return navTocEntries;
     }
 
-    /** A navPoint the way {@link #navTocEntries()} writes an entry. */
+    /** An NCX or nav target as {@code file#fragment}: the file's base name and the fragment, both percent-decoded. */
     public static String tocEntry(String href, @Nullable String fragment) {
-        return baseName(percentDecode(href)) + "#" + (fragment == null ? "" : percentDecode(fragment));
+        return target(baseName(percentDecode(href)), fragment == null ? "" : percentDecode(fragment));
     }
 
-    private static List<String> navTocEntries(ZipFile zip, Document opf, String opfDir) throws IOException {
-        Element manifest = firstChild(opf.getDocumentElement(), OPF_NS, "manifest");
-        String href = null;
-        for (Element item : manifest == null ? List.<Element>of() : children(manifest, OPF_NS, "item")) {
-            String properties = attribute(item, "properties");
-            if (properties != null && List.of(properties.strip().split("\\s+")).contains("nav")) {
-                href = attribute(item, "href");
-                break;
-            }
+    private static String target(String file, String fragment) {
+        return file + "#" + fragment;
+    }
+
+    /** {@code Epub.getTocFilenameEpub3}: the entry named by the tag holding the literal {@code properties="nav"}. */
+    private static @Nullable ZipEntry moonNavEntry(ZipFile zip, String opf, String opfDir, List<String> names) {
+        int at = opf.indexOf("properties=\"nav\"");
+        int tagStart = at < 0 ? -1 : opf.lastIndexOf('<', at);
+        int tagEnd = at < 0 ? -1 : opf.indexOf('>', at);
+        if (tagStart < 0 || tagEnd < 0) {
+            return null;
         }
-        ZipEntry entry = href == null ? null : findEntry(zip, resolveRelative(opfDir, percentDecode(href)));
+        String tag = opf.substring(tagStart, tagEnd);
+        int hrefAt = tag.indexOf("href=\"");
+        int hrefEnd = hrefAt < 0 ? -1 : tag.indexOf('"', hrefAt + 7);
+        if (hrefEnd < 0) {
+            return null;
+        }
+        String href = tag.substring(hrefAt + 6, hrefEnd);
+        ZipEntry entry = findEntry(zip, resolveRelative(opfDir, href));
         if (entry == null) {
-            return List.of();
+            entry = names.stream().filter(n -> n.endsWith(href)).findFirst().map(zip::getEntry).orElse(null);
         }
+        return entry;
+    }
+    private static List<NavTocEntry> navTocEntries(ZipFile zip, ZipEntry entry, List<String> names) throws IOException {
         Document nav;
         try {
             nav = parseXml(read(zip, entry));
@@ -274,23 +298,25 @@ public final class EpubPackage {
         if (navs.getLength() > 1) {
             for (int i = 0; i < navs.getLength(); i++) {
                 Element candidate = (Element) navs.item(i);
+                if (!candidate.hasAttribute("epub:type")) {
+                    break; // Moon+'s getNamedItem(...).getNodeValue() throws, and it falls back to the first nav
+                }
                 if (candidate.getAttribute("epub:type").contains("toc")) {
                     toc = candidate;
                     break;
                 }
             }
         }
-        List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
-        List<String> entries = new ArrayList<>();
+        List<NavTocEntry> entries = new ArrayList<>();
         for (Node ol = toc.getFirstChild(); ol != null; ol = ol.getNextSibling()) {
             if ("ol".equals(ol.getNodeName())) {
-                navListItems(ol, names, entries);
+                navListItems(ol, 0, names, entries);
             }
         }
         return List.copyOf(entries);
     }
 
-    private static void navListItems(Node ol, List<String> zipNames, List<String> entries) {
+    private static void navListItems(Node ol, int depth, List<String> zipNames, List<NavTocEntry> entries) {
         for (Node li = ol.getFirstChild(); li != null; li = li.getNextSibling()) {
             if (!"li".equals(li.getNodeName())) {
                 continue;
@@ -298,14 +324,15 @@ public final class EpubPackage {
             for (Node child = li.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if ("a".equals(child.getNodeName()) && child instanceof Element a) {
                     String src = percentDecode(a.getAttribute("href"));
-                    boolean named = a.getFirstChild() == null || a.getFirstChild().getNodeValue() != null;
+                    String label = a.getFirstChild() == null ? "" : a.getFirstChild().getNodeValue();
                     int hash = src.indexOf('#');
                     String file = baseName(hash < 0 ? src : src.substring(0, hash));
-                    if (named && !file.isEmpty() && zipNames.stream().anyMatch(n -> n.equals(file) || n.endsWith("/" + file))) {
-                        entries.add(file + "#" + (hash < 0 ? "" : src.substring(hash + 1)));
+                    if (label != null && hasFileNamed(zipNames, file)) {
+                        entries.add(new NavTocEntry(target(file, hash < 0 ? "" : src.substring(hash + 1)), depth,
+                                normalizedLabel(label)));
                     }
                 } else if ("ol".equals(child.getNodeName())) {
-                    navListItems(child, zipNames, entries);
+                    navListItems(child, depth + 1, zipNames, entries);
                 }
             }
         }
@@ -337,6 +364,11 @@ public final class EpubPackage {
         return (int) NAV_POINT_TAG.matcher(text).results().count();
     }
 
+    /** Whether some zip entry has this base name, in any folder. */
+    private static boolean hasFileNamed(List<String> names, String baseName) {
+        return !baseName.isEmpty() && names.stream().anyMatch(n -> n.equals(baseName) || n.endsWith("/" + baseName));
+    }
+
     /** The part after the last {@code /} ({@code T.getFilename}). */
     static String baseName(String path) {
         return path.substring(path.lastIndexOf('/') + 1);
@@ -358,7 +390,7 @@ public final class EpubPackage {
     public boolean containsFile(String href) {
         String decoded = percentDecode(href);
         String name = baseName(decoded);
-        return !name.isEmpty() && entryNames.stream().anyMatch(e -> e.equals(name) || e.endsWith("/" + name));
+        return hasFileNamed(entryNames, name);
     }
 
     /** The spine index of an NCX href (fragment already removed), comparing both sides percent-decoded. */
@@ -421,20 +453,6 @@ public final class EpubPackage {
             hrefs.add(href);
         }
         return List.copyOf(hrefs);
-    }
-
-    private static boolean declaresNavDocument(Document opf) {
-        Element manifest = firstChild(opf.getDocumentElement(), OPF_NS, "manifest");
-        if (manifest == null) {
-            return false;
-        }
-        for (Element item : children(manifest, OPF_NS, "item")) {
-            String properties = attribute(item, "properties");
-            if (properties != null && List.of(properties.strip().split("\\s+")).contains("nav")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static @Nullable String findNcxHref(Document opf) {
