@@ -77,6 +77,10 @@ public final class MoonChapterAssembly {
     /** {@code getTextBeforeTag}'s minimum text for a head handed to the previous chapter, and for chapter 0. */
     private static final int HEAD_MIN_TEXT = 20;
     private static final int FRONT_HEAD_MIN_TEXT = 40;
+    /** A following file this short and without text gets no page break before it. */
+    private static final int NEAR_EMPTY_FILE = 100;
+    /** {@code ifContentEmpty}: only a chapter shorter than this can be replaced by its title. */
+    private static final int EMPTY_CHAPTER_MAX = 200;
     private static final int TEXT_BEFORE_TAG_RAW = 80;
 
     private final EpubPackage epub;
@@ -181,9 +185,6 @@ public final class MoonChapterAssembly {
             return null;
         }
         List<NavPoint> navPoints = epub.navPoints().orElseThrow();
-        if (epub.hasEmptyNavPointFragment()) {
-            return "a navPoint ends in an empty '#': Moon+ reads it as an empty id, readsync as no fragment";
-        }
         int leading = MoonChapterMap.leadingOffset(epub, navPoints.getFirst());
         boolean treeToc = false;
         boolean hasIdStr = false;
@@ -193,6 +194,9 @@ public final class MoonChapterAssembly {
             hasIdStr |= navPoint.fragment() != null;
             OptionalInt spineIndex = epub.ncxSpineIndex(navPoint.href());
             if (spineIndex.isPresent() || epub.containsFile(navPoint.href())) {
+                if (navPoint.bareHash()) {
+                    return "a navPoint ends in an empty '#': Moon+ reads it as an empty id, readsync as no fragment";
+                }
                 // Moon+ decodes the whole content/@src (Uri.decode) before splitting off the id.
                 String fragment = navPoint.fragment() == null ? null : EpubPackage.percentDecode(navPoint.fragment());
                 list.add(new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), fragment,
@@ -274,11 +278,11 @@ public final class MoonChapterAssembly {
             if (idPos == -1) {
                 continue;
             }
-            SimilarId similar = similarIdPosition(file.body(), chapter.fragment, idPos);
+            SimilarId similar = similarIdPosition(file.bodyText(), chapter.fragment, idPos);
             if (similar.position() == -1 || similar.quote() == 0) {
                 continue;
             }
-            String body = file.body();
+            String body = file.bodyText();
             int open = body.indexOf(similar.quote(), similar.position());
             int close = open == -1 ? -1 : body.indexOf(similar.quote(), open + 2);
             if (open != -1 && close != -1) {
@@ -366,7 +370,7 @@ public final class MoonChapterAssembly {
         }
         FileText file = file(first.spineIndex);
         int idPos = idPosition(file, first.fragment);
-        if (idPos <= 100) {
+        if (idPos <= FAR_INTO_SHORT_BODY) {
             return null;
         }
         return textBeforeTag(file, idPos, FRONT_HEAD_MIN_TEXT);
@@ -380,15 +384,15 @@ public final class MoonChapterAssembly {
             return chapter.direct;
         }
         if (chapter.fragment == null && !nextHasIdTag(i)) {
-            if (chapter.hasSubChapter && i < chapters.size() - 1 && chapters.get(i + 1).spineIndex == chapter.spineIndex) {
+            if (chapter.hasSubChapter && sameFile(chapters, i, i + 1)) {
                 return new MappedHtml();
             }
             FileText file = file(chapter.spineIndex);
-            return new MappedHtml().appendSource(chapter.spineIndex, file.full, file.bodyStart, file.bodyEnd)
+            return new MappedHtml().appendSource(chapter.spineIndex, file.full, file.body.start(), file.body.end())
                     .append(additional(chapter));
         }
         MappedHtml text = textWithIdTag(i);
-        if (nextHasIdTag(i) && chapters.get(i + 1).spineIndex != chapter.spineIndex) {
+        if (nextHasIdTag(i) && !sameFile(chapters, i, i + 1)) {
             MappedHtml head = headBeforeAnchor(i + 1);
             if (head != null) {
                 text.appendSynthetic(PAGE_BREAK).append(head);
@@ -404,12 +408,12 @@ public final class MoonChapterAssembly {
     private MappedHtml textWithIdTag(int i) {
         Chapter chapter = chapters.get(i);
         FileText file = file(chapter.spineIndex);
-        String text = file.body();
+        String text = file.bodyText();
         String id = chapter.fragment;
         String nextId = i < chapters.size() - 1 ? chapters.get(i + 1).fragment : null;
         int idPos = startPosition(chapters, i, file);
         if (idPos == -1) {
-            if (i > 0 && !chapters.get(i - 1).hasSubChapter && chapters.get(i - 1).spineIndex == chapter.spineIndex) {
+            if (i > 0 && !chapters.get(i - 1).hasSubChapter && sameFile(chapters, i - 1, i)) {
                 return new MappedHtml().appendSynthetic("<h2>" + chapter.label + "</h2>").append(additional(chapter));
             }
             int end = text.length();
@@ -423,16 +427,13 @@ public final class MoonChapterAssembly {
             return slice(chapter.spineIndex, file, 0, end).append(additional(chapter));
         }
         int end = -1;
-        if (i < chapters.size() - 1 && chapters.get(i + 1).spineIndex == chapter.spineIndex) {
+        if (sameFile(chapters, i, i + 1)) {
             int nextPos = nextId != null ? idPosInHtml(text, nextId, idPos) : -1;
             if (nextPos == -1) {
                 nextPos = similarIdPosition(text, id, idPos).position();
             }
             if (nextPos != -1) {
-                end = text.lastIndexOf('<', nextPos);
-                if (end == -1) {
-                    end = text.lastIndexOf('\n', nextPos) + 2;
-                }
+                end = tagStartBefore(text, nextPos);
             }
         }
         if (end == -1) {
@@ -480,8 +481,8 @@ public final class MoonChapterAssembly {
     private int startPosition(List<Chapter> list, int i, FileText file) {
         Chapter chapter = list.get(i);
         int idPos = chapter.fragment == null ? 0 : idPosition(file, chapter.fragment);
-        if (idPos > 0 && i > 0 && list.get(i - 1).spineIndex != chapter.spineIndex) {
-            if (!farIntoBody(idPos, file.body().length()) || textBeforeTag(file, idPos, HEAD_MIN_TEXT) == null) {
+        if (idPos > 0 && i > 0 && !sameFile(list, i - 1, i)) {
+            if (!farIntoBody(idPos, file.bodyText().length()) || textBeforeTag(file, idPos, HEAD_MIN_TEXT) == null) {
                 idPos = 0;
             }
         }
@@ -526,9 +527,8 @@ public final class MoonChapterAssembly {
         Chapter chapter = chapters.get(j);
         FileText file = file(chapter.spineIndex);
         int idPos = idPosition(file, chapter.fragment);
-        String text = file.body();
-        if (idPos > 0 && j > 0 && chapters.get(j - 1).spineIndex != chapter.spineIndex
-                && farIntoBody(idPos, text.length())) {
+        String text = file.bodyText();
+        if (idPos > 0 && j > 0 && !sameFile(chapters, j - 1, j) && farIntoBody(idPos, text.length())) {
             return textBeforeTag(file, idPos, HEAD_MIN_TEXT);
         }
         return null;
@@ -539,7 +539,7 @@ public final class MoonChapterAssembly {
      * the body's start.
      */
     private static int idPosition(FileText file, String id) {
-        int pos = idPosInHtml(file.body(), id, 0);
+        int pos = idPosInHtml(file.bodyText(), id, 0);
         return pos == -1 && idPosInHtml(file.full, id, 0) >= 0 ? 0 : pos;
     }
 
@@ -565,13 +565,10 @@ public final class MoonChapterAssembly {
 
     /** {@code getTextBeforeTag}: the body up to the tag before {@code pos}, if at least 80 characters or enough text. */
     private @Nullable MappedHtml textBeforeTag(FileText file, int pos, int minText) {
-        String text = file.body();
+        String text = file.bodyText();
         int start = text.indexOf("<body");
         start = start == -1 ? 0 : text.indexOf('>', start) + 1;
-        int end = text.lastIndexOf('<', pos);
-        if (end == -1) {
-            end = text.lastIndexOf('\n', pos) + 2;
-        }
+        int end = tagStartBefore(text, pos);
         if (end <= start) {
             return null;
         }
@@ -600,12 +597,12 @@ public final class MoonChapterAssembly {
     private void appendFile(MappedHtml html, int spineIndex) {
         FileText file = file(spineIndex);
         html.appendSynthetic("<a name=" + file.name + ">");
-        String body = file.body();
-        boolean blank = body.length() <= 100 && plainText(body).isBlank();
+        String body = file.bodyText();
+        boolean blank = body.length() <= NEAR_EMPTY_FILE && plainText(body).isBlank();
         if (spineIndex > 0 && !blank) {
             html.appendSynthetic(PAGE_BREAK);
         }
-        html.appendSource(spineIndex, file.full, file.bodyStart, file.bodyEnd);
+        html.appendSource(spineIndex, file.full, file.body.start(), file.body.end());
     }
 
     /** {@code ifContentEmpty}: comments removed; a chapter left without text, images or its title becomes its title. */
@@ -623,14 +620,25 @@ public final class MoonChapterAssembly {
             from = open;
         }
         String html = cleaned.html();
-        if (html.length() < 200 && !html.contains("<im") && !html.contains(chapter.label) && plainText(html).isBlank()) {
+        if (html.length() < EMPTY_CHAPTER_MAX && !html.contains("<im") && !html.contains(chapter.label) && plainText(html).isBlank()) {
             return new MappedHtml().appendSynthetic("<center><h2>" + chapter.label + "</h2></center>");
         }
         return cleaned;
     }
 
     private MappedHtml slice(int spineIndex, FileText file, int from, int to) {
-        return new MappedHtml().appendSource(spineIndex, file.full, file.bodyStart + from, file.bodyStart + to);
+        return new MappedHtml().appendSource(spineIndex, file.full, file.body.start() + from, file.body.start() + to);
+    }
+
+    /** Whether chapters {@code i} and {@code j} (when both exist) come from the same spine file. */
+    private static boolean sameFile(List<Chapter> list, int i, int j) {
+        return i >= 0 && j < list.size() && list.get(i).spineIndex == list.get(j).spineIndex;
+    }
+
+    /** The {@code <} before {@code pos}; without one, two past the line start (as Moon+ computes it). */
+    private static int tagStartBefore(String text, int pos) {
+        int lt = text.lastIndexOf('<', pos);
+        return lt != -1 ? lt : text.lastIndexOf('\n', pos) + 2;
     }
 
     private static boolean farIntoBody(int idPos, int bodyLength) {
@@ -644,15 +652,15 @@ public final class MoonChapterAssembly {
 
     // ---- Files ----
 
-    /** A spine file's whole text and where Moon+'s {@code T.getHtmlBody} finds its body. */
     /** {@code [start, end)} in a file's text. */
     record BodyRange(int start, int end) {
     }
 
-    private record FileText(int spineIndex, String name, String full, int bodyStart, int bodyEnd) {
+    /** A spine file's whole text and where Moon+'s {@code T.getHtmlBody} finds its body. */
+    private record FileText(int spineIndex, String name, String full, BodyRange body) {
 
-        String body() {
-            return full.substring(bodyStart, bodyEnd);
+        String bodyText() {
+            return full.substring(body.start(), body.end());
         }
     }
 
@@ -670,7 +678,7 @@ public final class MoonChapterAssembly {
         String path = EpubPackage.percentDecode(epub.spinePath(spineIndex));
         String name = path.substring(path.lastIndexOf('/') + 1);
         BodyRange body = htmlBody(full);
-        return Optional.of(new FileText(spineIndex, name, full, body.start(), body.end()));
+        return Optional.of(new FileText(spineIndex, name, full, body));
     }
 
     /** {@code T.getHtmlBody}: between {@code <body…>} and the next {@code </body>}, else inside {@code <html…>}, else all. */

@@ -261,6 +261,15 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void aNavPointWithoutContentDoesNotCountAsABareHash() {
+        String noContent = "<navPoint id=\"x\" playOrder=\"9\"><navLabel><text>x</text></navLabel><content/></navPoint>";
+        MoonChapterAssembly assembly = book(np("1", "a.xhtml") + noContent + np("2", "b.xhtml"),
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>")));
+        assertThat(assembly.unsupportedReason()).isEmpty();
+        assertThat(html(assembly, 1)).isEqualTo("<p>b</p>");
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),

@@ -131,6 +131,14 @@ class EpubPackageTest {
     }
 
     @Test
+    void aBareHashIsNoFragmentButRecorded() {
+        NavPoint navPoint = EpubPackage.read(bookWithNcx(TestEpubs.ncx(TestEpubs.navPoint("1", "a", "text/chapter1.xhtml#"))))
+                .navPoints().orElseThrow().getFirst();
+        assertThat(navPoint.fragment()).isNull();
+        assertThat(navPoint.bareHash()).isTrue();
+    }
+
+    @Test
     void ncxIsFoundThroughTheSpineTocAttribute() {
         assertThat(EpubPackage.read(bookWithNcx(TOC_NCX)).navPoints()).hasValueSatisfying(n -> assertThat(n).hasSize(3));
     }

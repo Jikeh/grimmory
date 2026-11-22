@@ -17,6 +17,9 @@ import java.math.BigInteger;
  *                  file's start)
  * @param depth     how many navPoints it is nested in (0 at the top of the {@code navMap})
  * @param label     its {@code navLabel/text}, line breaks removed and trimmed as Moon+ does; {@code ""} without one
+ * @param bareHash  {@code content/@src} ends in a {@code #} with nothing after it: no fragment for readsync (and
+ *                  {@link #fragment()}), an empty id for Moon+
  */
-public record NavPoint(@Nullable BigInteger playOrder, String href, @Nullable String fragment, int depth, String label) {
+public record NavPoint(@Nullable BigInteger playOrder, String href, @Nullable String fragment, int depth, String label,
+                       boolean bareHash) {
 }
