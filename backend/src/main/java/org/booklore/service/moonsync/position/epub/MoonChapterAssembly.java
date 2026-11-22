@@ -43,14 +43,15 @@ import java.util.stream.IntStream;
  * </ul>
  * Each spine file contributes its {@code <body>} content ({@code T.getHtmlBody}).
  *
- * <p>Not ported, so reported as unsupported rather than guessed: books Moon+ reads through an EPUB 3 nav document
- * instead of the NCX (no NCX, or an untrusted one, next to a declared nav), a one-navPoint NCX over at most two
- * spine files (Moon+ keeps it as its only chapter), and any chapter whose Moon+ number would differ from readsync's
- * (front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip, or chapters
- * {@code deleteBrokenChapters} would drop). Chapters whose file is in the zip but not in the spine keep their numbers
+ * <p>Not ported, so reported as unsupported rather than guessed: books whose NCX Moon+ picks by file name
+ * differently from the OPF (or reads where readsync can't, e.g. without its namespace), books Moon+ reads through an
+ * EPUB 3 nav document instead of the NCX (no NCX, or an untrusted one, next to a declared nav), a one-navPoint NCX
+ * over at most two spine files (Moon+ keeps it as its only chapter), and any chapter whose Moon+ number would differ
+ * from readsync's: front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip or
+ * whose label has no text, a bare {@code #}, fewer than two resolving navPoints, or chapters
+ * {@code deleteBrokenChapters} would drop. Chapters whose file is in the zip but not in the spine keep their numbers
  * but have no text here. Also not ported: Moon+ choosing the nav over the NCX when both exist (the two normally
- * agree), finding the NCX by file name (and files by name only), its tours and single-chapter splitting
- * ({@code trySplitChapters}).
+ * agree), finding files by name only, its tours and single-chapter splitting ({@code trySplitChapters}).
  */
 public final class MoonChapterAssembly {
 
@@ -171,23 +172,17 @@ public final class MoonChapterAssembly {
     }
 
     private @Nullable String buildChapters(List<Chapter> list) {
+        String unsupported = bookLevelDifference();
+        if (unsupported != null) {
+            return unsupported;
+        }
         if (!epub.ncxTrusted()) {
-            int navPoints = epub.navPoints().map(List::size).orElse(0);
-            if (epub.declaresNavDocument()) {
-                return "Moon+ reads this book's chapters from its EPUB 3 nav document (not ported)";
-            }
-            if (navPoints == 1 && epub.spineLength() <= 2) {
-                return "a one-navPoint NCX over at most two spine files: Moon+ keeps the navPoint as its only chapter";
-            }
             for (int i = 0; i < epub.spineLength(); i++) {
                 list.add(new Chapter(i, i, null, 0, ""));
             }
             return null;
         }
         List<NavPoint> navPoints = epub.navPoints().orElseThrow();
-        if (epub.moonReadsAnotherNcx()) {
-            return "Moon+ picks its NCX by file name and would read another one than the OPF names";
-        }
         int leading = MoonChapterMap.leadingOffset(epub, navPoints.getFirst());
         boolean treeToc = false;
         boolean hasIdStr = false;
@@ -261,6 +256,26 @@ public final class MoonChapterAssembly {
             }
         } catch (MissingFileException e) {
             return e.getMessage();
+        }
+        return null;
+    }
+
+    /** Why Moon+ would read this book's chapter list from somewhere readsync doesn't, if it would. */
+    private @Nullable String bookLevelDifference() {
+        if (epub.moonReadsAnotherNcx()) {
+            return "Moon+ picks its NCX by file name and would read another one than the OPF names";
+        }
+        if (epub.ncxTrusted()) {
+            return null;
+        }
+        if (epub.moonNcxNavPoints() > 1) {
+            return "Moon+ numbers this book by its NCX, which readsync can't read (no namespace, or not named in the OPF)";
+        }
+        if (epub.declaresNavDocument()) {
+            return "Moon+ reads this book's chapters from its EPUB 3 nav document (not ported)";
+        }
+        if (epub.navPoints().map(List::size).orElse(0) == 1 && epub.spineLength() <= 2) {
+            return "a one-navPoint NCX over at most two spine files: Moon+ keeps the navPoint as its only chapter";
         }
         return null;
     }

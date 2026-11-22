@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.regex.Matcher;
@@ -64,6 +65,8 @@ public final class EpubPackage {
     private static final String NCX_MEDIA_TYPE = "application/x-dtbncx+xml";
     private static final Charset ZIP_NAME_FALLBACK = Charset.forName("IBM437");
     /** Python's {@code int()}: optional surrounding whitespace and sign, decimal digits, single underscores between. */
+    /** A {@code navPoint} start tag, with or without a prefix, in lower-cased text. */
+    private static final Pattern NAV_POINT_TAG = Pattern.compile("<(?:[a-z0-9_.-]+:)?navpoint[\\s>/]");
     private static final Pattern PYTHON_INT = Pattern.compile("([+-]?)(\\p{Nd}+(?:_\\p{Nd}+)*)");
     private static final DocumentBuilderFactory XML = xmlFactory();
 
@@ -74,9 +77,12 @@ public final class EpubPackage {
     private final boolean epub3Nav;
     private final List<String> entryNames;
     private final @Nullable String ncxEntry;
+    private final @Nullable String moonNcx;
+    private final int moonNavPoints;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
-                        boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry) {
+                        boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry,
+                        @Nullable String moonNcx, int moonNavPoints) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
@@ -84,6 +90,8 @@ public final class EpubPackage {
         this.epub3Nav = epub3Nav;
         this.entryNames = entryNames;
         this.ncxEntry = ncxEntry;
+        this.moonNcx = moonNcx;
+        this.moonNavPoints = moonNavPoints;
     }
 
     /**
@@ -97,11 +105,14 @@ public final class EpubPackage {
             String opfDir = dirname(opfPath);
             Document opf = parseXml(readEntry(zip, opfPath));
             List<String> spine = parseSpineHrefs(opf);
-            List<NavPoint> navPoints = parseNavPoints(zip, opf, opfDir);
+            String ncxHref = findNcxHref(opf);
+            ZipEntry ncx = ncxHref == null ? null : findEntry(zip, resolveRelative(opfDir, ncxHref));
+            List<NavPoint> navPoints = ncx == null ? null : parseNavPoints(zip, ncx);
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
-            String ncx = findNcxHref(opf);
-            String ncxEntry = ncx == null ? null : entryName(zip, resolveRelative(opfDir, ncx));
-            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names, ncxEntry);
+            String moonNcx = moonNcxEntry(names);
+            int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
+            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names,
+                    ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints);
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -184,15 +195,46 @@ public final class EpubPackage {
 
     /**
      * Whether Moon+ would read a different NCX than this package does ({@link #navPoints()} follows the OPF, as
-     * readsync does). Moon+ goes by file name ({@code Epub.getTocFilename}): the zip's only {@code toc.ncx}, else its
-     * only {@code .ncx}; a zip with several and no unique {@code toc.ncx} counts as different (Moon+'s pick then
-     * depends on its sorted file list).
+     * readsync does), or none can be told: a zip with {@code .ncx} files but no single one Moon+ would pick.
      */
     public boolean moonReadsAnotherNcx() {
-        List<String> tocs = entryNames.stream().filter(n -> baseName(n).equals("toc.ncx")).toList();
-        List<String> ncxs = entryNames.stream().filter(n -> n.endsWith(".ncx")).toList();
-        String moon = tocs.size() == 1 ? tocs.getFirst() : tocs.isEmpty() && ncxs.size() == 1 ? ncxs.getFirst() : null;
-        return ncxs.isEmpty() ? ncxEntry != null : moon == null || !moon.equals(ncxEntry);
+        boolean anyNcx = entryNames.stream().anyMatch(n -> n.toLowerCase(Locale.ROOT).endsWith(".ncx"));
+        return anyNcx ? !Objects.equals(moonNcx, ncxEntry) : ncxEntry != null;
+    }
+
+    /**
+     * How many {@code navPoint} start tags the NCX Moon+ picks holds, counted by name as Moon+'s {@code addNCXChapters}
+     * matches them (any prefix, any case, no namespace check). More than one there while {@link #ncxTrusted()} is
+     * false means Moon+ numbers by an NCX that readsync doesn't read.
+     */
+    public int moonNcxNavPoints() {
+        return moonNavPoints;
+    }
+
+    /**
+     * The NCX Moon+ reads ({@code Epub.getTocFilename}), by file name: the zip's only entry named {@code toc.ncx};
+     * else its only entry ending in {@code toc.ncx}, ignoring case; else its only {@code .ncx}. Null when there is none,
+     * or several tie (Moon+'s pick then depends on its sorted file list).
+     */
+    private static @Nullable String moonNcxEntry(List<String> names) {
+        List<String> exact = names.stream().filter(n -> baseName(n).equals("toc.ncx")).toList();
+        if (exact.size() == 1) {
+            return exact.getFirst();
+        }
+        if (!exact.isEmpty()) {
+            return null;
+        }
+        List<String> toc = names.stream().filter(n -> n.toLowerCase(Locale.ROOT).endsWith("toc.ncx")).toList();
+        if (!toc.isEmpty()) {
+            return toc.size() == 1 ? toc.getFirst() : null;
+        }
+        List<String> ncx = names.stream().filter(n -> n.toLowerCase(Locale.ROOT).endsWith(".ncx")).toList();
+        return ncx.size() == 1 ? ncx.getFirst() : null;
+    }
+
+    private static int countNavPointTags(ZipFile zip, String name) throws IOException {
+        String text = new String(readEntry(zip, name), StandardCharsets.UTF_8).toLowerCase(Locale.ROOT);
+        return (int) NAV_POINT_TAG.matcher(text).results().count();
     }
 
     private static String baseName(String path) {
@@ -324,15 +366,11 @@ public final class EpubPackage {
         return null;
     }
 
-    private static @Nullable List<NavPoint> parseNavPoints(ZipFile zip, Document opf, String opfDir) throws IOException {
-        String ncxHref = findNcxHref(opf);
-        if (ncxHref == null) {
-            return null;
-        }
+    private static @Nullable List<NavPoint> parseNavPoints(ZipFile zip, ZipEntry entry) throws IOException {
         Document ncx;
         try {
-            ncx = parseXml(readEntry(zip, resolveRelative(opfDir, ncxHref)));
-        } catch (MissingEntryException | SAXException e) {
+            ncx = parseXml(read(zip, entry));
+        } catch (SAXException e) {
             return null;
         }
         Element navMap = firstChild(ncx.getDocumentElement(), NCX_NS, "navMap");
@@ -442,26 +480,28 @@ public final class EpubPackage {
         return baseDir.isEmpty() ? href : baseDir + "/" + href;
     }
 
-    /** The name of the entry {@link #readEntry} would read for {@code path}, or null when there is none. */
-    private static @Nullable String entryName(ZipFile zip, String path) {
-        if (zip.getEntry(path) != null) {
-            return path;
+    /** Exact name first, then the first entry (in central-directory order) whose name matches ignoring case. */
+    private static @Nullable ZipEntry findEntry(ZipFile zip, String path) {
+        ZipEntry entry = zip.getEntry(path);
+        if (entry != null) {
+            return entry;
         }
         String lower = path.toLowerCase(Locale.ROOT);
-        return Collections.list(zip.entries()).stream().map(ZipEntry::getName)
-                .filter(n -> n.toLowerCase(Locale.ROOT).equals(lower)).findFirst().orElse(null);
+        return Collections.list(zip.entries()).stream()
+                .filter(e -> e.getName().toLowerCase(Locale.ROOT).equals(lower))
+                .findFirst()
+                .orElse(null);
     }
 
-    /** Exact name first, then the first entry (in central-directory order) whose name matches ignoring case. */
     private static byte[] readEntry(ZipFile zip, String path) throws IOException {
-        ZipEntry entry = zip.getEntry(path);
+        ZipEntry entry = findEntry(zip, path);
         if (entry == null) {
-            String lower = path.toLowerCase(Locale.ROOT);
-            entry = Collections.list(zip.entries()).stream()
-                    .filter(e -> e.getName().toLowerCase(Locale.ROOT).equals(lower))
-                    .findFirst()
-                    .orElseThrow(() -> new MissingEntryException(path));
+            throw new MissingEntryException(path);
         }
+        return read(zip, entry);
+    }
+
+    private static byte[] read(ZipFile zip, ZipEntry entry) throws IOException {
         try (InputStream in = zip.getInputStream(entry)) {
             return in.readAllBytes();
         }

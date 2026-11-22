@@ -289,6 +289,35 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void anNcxTheOpfDoesNotNameStillNumbersTheBookForMoon() {
+        // No NCX in the OPF (readsync: spine order), but a toc.ncx with chapters in the zip: Moon+ reads that one.
+        Map<String, String> zip = files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"), "c.xhtml", body("<p>c</p>"),
+                "toc.ncx", TestEpubs.ncx(np("1", "b.xhtml") + np("2", "c.xhtml")));
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir,
+                TestEpubs.opf(false, "a.xhtml", "b.xhtml", "c.xhtml"), null, zip)));
+        assertThat(assembly.unsupportedReason()).isPresent();
+    }
+
+    @Test
+    void anNcxWithoutItsNamespaceIsReadByMoonButNotByReadsync() {
+        String ncx = TestEpubs.ncx(np("1", "a.xhtml") + np("2", "b.xhtml")).replace(" xmlns=\"http://www.daisy.org/z3986/2005/ncx/\"", "");
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir,
+                TestEpubs.opf(true, "a.xhtml", "b.xhtml", "c.xhtml"), ncx,
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"), "c.xhtml", body("<p>c</p>")))));
+        assertThat(assembly.unsupportedReason()).hasValueSatisfying(r -> assertThat(r).contains("can't read"));
+    }
+
+    @Test
+    void anUpperCaseNcxNameIsTheOneMoonPicks() {
+        Map<String, String> zip = files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"),
+                "TOC.NCX", TestEpubs.ncx(np("1", "a.xhtml") + np("2", "b.xhtml")));
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir,
+                TestEpubs.opf(true, "a.xhtml", "b.xhtml").replace("href=\"toc.ncx\"", "href=\"TOC.NCX\""), null, zip)));
+        assertThat(assembly.unsupportedReason()).isEmpty();
+        assertThat(html(assembly, 1)).isEqualTo("<p>b</p>");
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),
