@@ -208,7 +208,7 @@ public final class MoonChapterAssembly {
                 String fragment = navPoint.fragment() == null ? null : EpubPackage.percentDecode(navPoint.fragment());
                 Chapter chapter = new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), fragment,
                         navPoint.depth(), navPoint.label());
-                chapter.tocEntry = EpubPackage.tocEntry(navPoint.href(), navPoint.bareHash() ? "" : navPoint.fragment());
+                chapter.tocEntry = EpubPackage.tocEntry(navPoint.href(), navPoint.bareHash() ? "" : fragment);
                 list.add(chapter);
             }
         }

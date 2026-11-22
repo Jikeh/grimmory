@@ -354,6 +354,11 @@ class MoonChapterAssemblyTest {
                 .as("a shorter nav: Moon+ keeps the NCX").isEmpty();
         assertThat(bookWithNav("<li><a href=\"a.xhtml\">Pride & Prejudice</a></li><li><a href=\"b.xhtml\">B</a></li>")
                 .unsupportedReason()).as("a bare & Moon+ repairs (getDocument)").hasValueSatisfying(r -> assertThat(r).contains("&"));
+        assertThat(bookWithNav("<li><a href=\"a.xhtml#\">A</a></li><li><a href=\"b.xhtml\">B</a></li>").unsupportedReason())
+                .as("a bare # (an empty id for Moon+) is not the NCX's plain file").isPresent();
+        assertThat(bookWithNav("<li><a href=\"a.xhtml\">A</a></li><li><a>no href</a></li>"
+                + "<li><a href=\"b.xhtml#x\">X</a></li><li><a href=\"b.xhtml\">B</a></li>").unsupportedReason())
+                .as("an a without href ends Moon+'s nav read, so the nav is shorter and the NCX stays").isEmpty();
     }
 
     @Test

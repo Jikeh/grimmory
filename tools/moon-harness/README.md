@@ -68,11 +68,11 @@ and so does a comparison with no cases (e.g. a samples override holding no match
 
 Tickets 05, 06, 07 (foliate output), 08 (MOBI6 forward only), 13, 16, 19 and 20 each add one.
 
-**Diagnosing a parser-parity difference**: the digest only says *that* the trees differ. Print both event sequences
-for the spine file and diff them: on the Java side `EpubParserParityComparison.events(MoonHtml.parse(html))`, on the
+**Diagnosing a parser-parity difference**: the digest only says *that* the trees differ. Print both event sequences for
+the spine file and diff them: on the Java side `EpubParserParityComparison.events(MoonHtml.parse(html))`, on the
 reference side `tree_signature.js` with `TREE_EVENTS=1` (plain `node`, `READSYNC_CFI_BRIDGE` pointing at readsync's
-`cfi_bridge` folder, a JSON array of HTML strings on stdin). Fix the difference in `MoonHtml` (each normalization there names the WHATWG rule
-jsoup departs from), add the construct to `edge-cases/make_epub.py`, and pin it in `MoonHtmlTest`.
+`cfi_bridge` folder, a JSON array of HTML strings on stdin). Fix the difference in `MoonHtml` (each normalization there
+names the WHATWG rule jsoup departs from), add the construct to `edge-cases/make_epub.py`, and pin it in `MoonHtmlTest`.
 
 ## Known differences (exempt from parity)
 

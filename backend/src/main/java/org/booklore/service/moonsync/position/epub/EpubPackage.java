@@ -77,7 +77,7 @@ public final class EpubPackage {
     private final String opfDir;
     private final List<String> spineHrefs;
     private final @Nullable List<NavPoint> navPoints;
-    private final boolean epub3Nav;
+    private final boolean moonNavDocument;
     private final List<String> entryNames;
     private final @Nullable String ncxEntry;
     private final @Nullable String moonNcx;
@@ -87,14 +87,14 @@ public final class EpubPackage {
     private final boolean navRepairedByMoon;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
-                        boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry,
+                        boolean moonNavDocument, List<String> entryNames, @Nullable String ncxEntry,
                         @Nullable String moonNcx, int moonNavPoints, boolean irregularNcx,
                         NavRead nav) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
         this.navPoints = navPoints;
-        this.epub3Nav = epub3Nav;
+        this.moonNavDocument = moonNavDocument;
         this.entryNames = entryNames;
         this.ncxEntry = ncxEntry;
         this.moonNcx = moonNcx;
@@ -205,7 +205,7 @@ public final class EpubPackage {
      * ({@code Epub.getChapters}); readsync, and so {@link #navPoints()}, reads the NCX only.
      */
     public boolean hasMoonNavDocument() {
-        return epub3Nav;
+        return moonNavDocument;
     }
 
     /**
@@ -270,13 +270,16 @@ public final class EpubPackage {
     private record NavRead(List<NavTocEntry> entries, boolean repairedByMoon) {
     }
 
-    /** An NCX or nav target as {@code file#fragment}: the file's base name and the fragment, both percent-decoded. */
+    /**
+     * An NCX or nav target: the file's base name, then {@code #} and the fragment when the href has a {@code #} (even
+     * an empty one, which Moon+ reads as an empty id), both percent-decoded.
+     */
     public static String tocEntry(String href, @Nullable String fragment) {
-        return target(baseName(percentDecode(href)), fragment == null ? "" : percentDecode(fragment));
+        return target(baseName(percentDecode(href)), fragment == null ? null : percentDecode(fragment));
     }
 
-    private static String target(String file, String fragment) {
-        return file + "#" + fragment;
+    private static String target(String file, @Nullable String fragment) {
+        return fragment == null ? file : file + "#" + fragment;
     }
 
     /** {@code Epub.getTocFilenameEpub3}: the entry named by the tag holding the literal {@code properties="nav"}. */
@@ -331,33 +334,41 @@ public final class EpubPackage {
         }
         List<NavTocEntry> entries = new ArrayList<>();
         for (Node ol = toc.getFirstChild(); ol != null; ol = ol.getNextSibling()) {
-            if ("ol".equals(ol.getNodeName())) {
-                navListItems(ol, 0, names, entries);
+            if ("ol".equals(ol.getNodeName()) && !navListItems(ol, 0, names, entries)) {
+                break;
             }
         }
         return new NavRead(List.copyOf(entries), false);
     }
 
-    private static void navListItems(Node ol, int depth, List<String> zipNames, List<NavTocEntry> entries) {
+    /**
+     * Reads one {@code ol} into {@code entries}; false once an {@code a} without {@code href} ends the read (Moon+'s
+     * {@code getNamedItem("href").getNodeValue()} throws there, and {@code getChaptersFromToc} keeps what it had).
+     */
+    private static boolean navListItems(Node ol, int depth, List<String> zipNames, List<NavTocEntry> entries) {
         for (Node li = ol.getFirstChild(); li != null; li = li.getNextSibling()) {
             if (!"li".equals(li.getNodeName())) {
                 continue;
             }
             for (Node child = li.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if ("a".equals(child.getNodeName()) && child instanceof Element a) {
+                    if (!a.hasAttribute("href")) {
+                        return false;
+                    }
                     String src = percentDecode(a.getAttribute("href"));
                     String label = a.getFirstChild() == null ? "" : a.getFirstChild().getNodeValue();
                     int hash = src.indexOf('#');
                     String file = baseName(hash < 0 ? src : src.substring(0, hash));
                     if (label != null && hasFileNamed(zipNames, file)) {
-                        entries.add(new NavTocEntry(target(file, hash < 0 ? "" : src.substring(hash + 1)), depth,
+                        entries.add(new NavTocEntry(target(file, hash < 0 ? null : src.substring(hash + 1)), depth,
                                 normalizedLabel(label)));
                     }
-                } else if ("ol".equals(child.getNodeName())) {
-                    navListItems(child, depth + 1, zipNames, entries);
+                } else if ("ol".equals(child.getNodeName()) && !navListItems(child, depth + 1, zipNames, entries)) {
+                    return false;
                 }
             }
         }
+        return true;
     }
 
     /**
