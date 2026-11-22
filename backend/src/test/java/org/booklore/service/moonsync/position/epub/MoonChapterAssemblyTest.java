@@ -323,13 +323,35 @@ class MoonChapterAssemblyTest {
         for (String odd : List.of(
                 "<pageList>" + np("9", "a.xhtml") + "</pageList>",           // navPoint outside navMap/navPoint
                 "<navPoint playOrder=\"9\"><content href=\"a.xhtml\"/></navPoint>", // content without src
-                np("9", "a%23x.xhtml"))) {                                     // %23 Moon+ decodes into an id
+                np("9", "a%23x.xhtml"),                                        // %23 Moon+ decodes into an id
+                "<navPoint playOrder=\"9\"><content src=\"a.xhtml\"/><content src=\"b.xhtml\"/></navPoint>")) { // several contents
             MoonChapterAssembly assembly = book(np("1", "a.xhtml") + odd + np("2", "b.xhtml"), files);
             assertThat(assembly.unsupportedReason()).as(odd).hasValueSatisfying(r -> assertThat(r).contains("differently"));
         }
         assertThat(book(np("1", "a.xhtml") + np("2", "b%20c.xhtml#x"),
                 files("a.xhtml", body("<p>a</p>"), "b c.xhtml", body("<h2 id=\"x\">x</h2>"))).unsupportedReason())
                 .as("an encoded space is not a #").isEmpty();
+    }
+
+    private MoonChapterAssembly bookWithNav(String navItems) {
+        String opf = TestEpubs.opf(true, "a.xhtml", "b.xhtml").replace("</manifest>",
+                "  <item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/></manifest>");
+        String nav = "<?xml version=\"1.0\"?><html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\">"
+                + "<body><nav epub:type=\"toc\"><ol>" + navItems + "</ol></nav></body></html>";
+        return MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir, opf, TestEpubs.ncx(np("1", "a.xhtml") + np("2", "b.xhtml")),
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<h2 id=\"x\">b</h2>"), "nav.xhtml", nav))));
+    }
+
+    @Test
+    void aTrustedNcxNextToANavThatDiffersIsUnsupported() {
+        // getChapters: Moon+ re-reads the chapters from the nav and keeps them unless there are fewer.
+        assertThat(bookWithNav("<li><a href=\"a.xhtml\">A</a></li><li><a href=\"b.xhtml\">B</a></li>"
+                + "<li><a href=\"b.xhtml#x\">X</a></li>").unsupportedReason())
+                .hasValueSatisfying(r -> assertThat(r).contains("nav"));
+        assertThat(bookWithNav("<li><a href=\"a.xhtml\">A</a><ol><li><a href=\"b.xhtml\">B</a></li></ol></li>").unsupportedReason())
+                .as("the same entries, nested").isEmpty();
+        assertThat(bookWithNav("<li><a href=\"a.xhtml\">A</a></li>").unsupportedReason())
+                .as("a shorter nav: Moon+ keeps the NCX").isEmpty();
     }
 
     @Test

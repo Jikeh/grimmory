@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import javax.xml.XMLConstants;
@@ -80,10 +81,12 @@ public final class EpubPackage {
     private final @Nullable String moonNcx;
     private final int moonNavPoints;
     private final boolean irregularNcx;
+    private final List<String> navTocEntries;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
                         boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry,
-                        @Nullable String moonNcx, int moonNavPoints, boolean irregularNcx) {
+                        @Nullable String moonNcx, int moonNavPoints, boolean irregularNcx,
+                        List<String> navTocEntries) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
@@ -94,6 +97,7 @@ public final class EpubPackage {
         this.moonNcx = moonNcx;
         this.moonNavPoints = moonNavPoints;
         this.irregularNcx = irregularNcx;
+        this.navTocEntries = navTocEntries;
     }
 
     /**
@@ -109,13 +113,14 @@ public final class EpubPackage {
             List<String> spine = parseSpineHrefs(opf);
             String ncxHref = findNcxHref(opf);
             ZipEntry ncx = ncxHref == null ? null : findEntry(zip, resolveRelative(opfDir, ncxHref));
-            NcxRead read = ncx == null ? new NcxRead(null, false) : parseNavPoints(zip, ncx);
+            NcxRead read = ncx == null ? new NcxRead(null, false) : readNcx(zip, ncx);
             List<NavPoint> navPoints = read.navPoints();
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
             String moonNcx = moonNcxEntry(names);
             int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
             return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names,
-                    ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints, read.irregular());
+                    ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints, read.irregular(),
+                    navTocEntries(zip, opf, opfDir));
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -217,12 +222,93 @@ public final class EpubPackage {
     /**
      * Whether the NCX has a shape Moon+'s {@code addNCXChapters} reads differently from readsync's walk: a navPoint
      * nested in some other element (Moon+ only follows {@code navMap → navPoint → navPoint}), a navPoint with several
-     * {@code content}s or whose {@code content} has other attributes but no {@code src} (Moon+ falls back to them), or
-     * a {@code src}
+     * {@code content}s or whose {@code content} has other attributes but no {@code src} (Moon+ falls back to them),
+     * or a {@code src}
      * whose {@code %23} Moon+ decodes into a {@code #} before splitting off the id.
      */
     public boolean hasIrregularNcx() {
         return irregularNcx;
+    }
+
+    /**
+     * The EPUB 3 nav document's table of contents as Moon+ reads it ({@code Epub.getChaptersFromToc} for a nav,
+     * {@code addEpub3NCXChapters}), each entry {@code file#fragment} (base name, percent-decoded; {@code #} with an
+     * empty fragment when there is none): the {@code nav} whose {@code epub:type} has {@code toc} (the first when there
+     * is only one), its {@code ol}/{@code li}/{@code a} tree in document order, entries whose file is in the zip and
+     * whose {@code a} has no children or starts with text. Empty without a readable nav document.
+     */
+    public List<String> navTocEntries() {
+        return navTocEntries;
+    }
+
+    /** A navPoint the way {@link #navTocEntries()} writes an entry. */
+    public static String tocEntry(String href, @Nullable String fragment) {
+        return baseName(percentDecode(href)) + "#" + (fragment == null ? "" : percentDecode(fragment));
+    }
+
+    private static List<String> navTocEntries(ZipFile zip, Document opf, String opfDir) throws IOException {
+        Element manifest = firstChild(opf.getDocumentElement(), OPF_NS, "manifest");
+        String href = null;
+        for (Element item : manifest == null ? List.<Element>of() : children(manifest, OPF_NS, "item")) {
+            String properties = attribute(item, "properties");
+            if (properties != null && List.of(properties.strip().split("\\s+")).contains("nav")) {
+                href = attribute(item, "href");
+                break;
+            }
+        }
+        ZipEntry entry = href == null ? null : findEntry(zip, resolveRelative(opfDir, percentDecode(href)));
+        if (entry == null) {
+            return List.of();
+        }
+        Document nav;
+        try {
+            nav = parseXml(read(zip, entry));
+        } catch (SAXException e) {
+            return List.of(); // Moon+'s parse fails too, and it keeps the NCX
+        }
+        NodeList navs = nav.getElementsByTagName("nav");
+        if (navs.getLength() == 0) {
+            return List.of();
+        }
+        Element toc = (Element) navs.item(0);
+        if (navs.getLength() > 1) {
+            for (int i = 0; i < navs.getLength(); i++) {
+                Element candidate = (Element) navs.item(i);
+                if (candidate.getAttribute("epub:type").contains("toc")) {
+                    toc = candidate;
+                    break;
+                }
+            }
+        }
+        List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
+        List<String> entries = new ArrayList<>();
+        for (Node ol = toc.getFirstChild(); ol != null; ol = ol.getNextSibling()) {
+            if ("ol".equals(ol.getNodeName())) {
+                navListItems(ol, names, entries);
+            }
+        }
+        return List.copyOf(entries);
+    }
+
+    private static void navListItems(Node ol, List<String> zipNames, List<String> entries) {
+        for (Node li = ol.getFirstChild(); li != null; li = li.getNextSibling()) {
+            if (!"li".equals(li.getNodeName())) {
+                continue;
+            }
+            for (Node child = li.getFirstChild(); child != null; child = child.getNextSibling()) {
+                if ("a".equals(child.getNodeName()) && child instanceof Element a) {
+                    String src = percentDecode(a.getAttribute("href"));
+                    boolean named = a.getFirstChild() == null || a.getFirstChild().getNodeValue() != null;
+                    int hash = src.indexOf('#');
+                    String file = baseName(hash < 0 ? src : src.substring(0, hash));
+                    if (named && !file.isEmpty() && zipNames.stream().anyMatch(n -> n.equals(file) || n.endsWith("/" + file))) {
+                        entries.add(file + "#" + (hash < 0 ? "" : src.substring(hash + 1)));
+                    }
+                } else if ("ol".equals(child.getNodeName())) {
+                    navListItems(child, zipNames, entries);
+                }
+            }
+        }
     }
 
     /**
@@ -385,7 +471,7 @@ public final class EpubPackage {
     private record NcxRead(@Nullable List<NavPoint> navPoints, boolean irregular) {
     }
 
-    private static NcxRead parseNavPoints(ZipFile zip, ZipEntry entry) throws IOException {
+    private static NcxRead readNcx(ZipFile zip, ZipEntry entry) throws IOException {
         Document ncx;
         try {
             ncx = parseXml(read(zip, entry));
@@ -409,7 +495,7 @@ public final class EpubPackage {
                 irregular |= content != null && content.getAttributes().getLength() > (src == null ? 0 : 1);
                 continue;
             }
-            irregular |= percentDecode(src).chars().filter(c -> c == '#').count() != src.chars().filter(c -> c == '#').count();
+            irregular |= src.toLowerCase(Locale.ROOT).contains("%23");
             int hash = src.indexOf('#');
             String href = hash < 0 ? src : src.substring(0, hash);
             String fragment = hash < 0 || hash == src.length() - 1 ? null : src.substring(hash + 1);

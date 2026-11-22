@@ -89,8 +89,9 @@ changed; the `.po` only when the position changed, except on a forced "Sync to c
     many `&nbsp;` paragraphs).
   - Not ported (reported as unsupported, never guessed): books whose NCX Moon+ picks by file name differently from
     the OPF, or reads where readsync can't (not named in the OPF, no namespace), or reads differently (a navPoint
-    outside `navMap`/`navPoint`, a `content` without `src`, a `%23` in a `src`); books Moon+ reads through an EPUB 3
-    nav document; a one-navPoint NCX over at most two spine files; and books whose Moon+ chapter numbers differ from
+    outside `navMap`/`navPoint`, several `content`s, a `content` with other attributes but no `src`, a `%23` in a
+    `src`); books Moon+ reads through an EPUB 3 nav document (no usable NCX, or a nav at least as long as the NCX
+    whose entries differ); a one-navPoint NCX over at most two spine files; and books whose Moon+ chapter numbers differ from
     readsync's: front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip or whose
     label has no text, a bare `#`, fewer than two resolving navPoints, or chapters `deleteBrokenChapters` drops.
     [decompiled `Epub.getTocFilename`, `addNCXChapters`, `getCName`, `getChapter`, `getChaptersFromOpf`,

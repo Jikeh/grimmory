@@ -52,7 +52,8 @@ import java.util.stream.IntStream;
  * whose label has no text, a bare {@code #}, fewer than two resolving navPoints, or chapters
  * {@code deleteBrokenChapters} would drop. Chapters whose file is in the zip but not in the spine keep their numbers
  * but have no text here. Also not ported: Moon+ choosing the nav over the NCX when both exist (the two normally
- * agree), finding files by name only, its tours and single-chapter splitting ({@code trySplitChapters}).
+ * agree; when they don't, the book is reported unsupported), finding files by name only, its tours and
+ * single-chapter splitting ({@code trySplitChapters}).
  */
 public final class MoonChapterAssembly {
 
@@ -161,6 +162,8 @@ public final class MoonChapterAssembly {
         @Nullable SpineRange lazy;
         /** Front matter Moon+ inserts as chapter 0, already assembled. */
         @Nullable MappedHtml direct;
+        /** The navPoint as {@link EpubPackage#tocEntry} writes it, to compare with the EPUB 3 nav. */
+        String tocEntry = "";
 
         Chapter(int number, int spineIndex, @Nullable String fragment, int depth, String label) {
             this.number = number;
@@ -202,12 +205,20 @@ public final class MoonChapterAssembly {
                 }
                 // Moon+ decodes the whole content/@src (Uri.decode) before splitting off the id.
                 String fragment = navPoint.fragment() == null ? null : EpubPackage.percentDecode(navPoint.fragment());
-                list.add(new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), fragment,
-                        navPoint.depth(), navPoint.label()));
+                Chapter chapter = new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), fragment,
+                        navPoint.depth(), navPoint.label());
+                chapter.tocEntry = EpubPackage.tocEntry(navPoint.href(), navPoint.bareHash() ? "" : navPoint.fragment());
+                list.add(chapter);
             }
         }
         if (list.stream().allMatch(c -> c.spineIndex == OUTSIDE_SPINE)) {
             return "no navPoint resolves to a spine file";
+        }
+        List<String> ncxEntries = list.stream().map(c -> c.tocEntry).toList();
+        List<String> nav = epub.navTocEntries();
+        if (nav.size() >= ncxEntries.size() && !nav.equals(ncxEntries)) {
+            // getChapters: Moon+ re-reads the chapter list from the nav and keeps it unless it is shorter.
+            return "Moon+ numbers this book by its EPUB 3 nav, whose entries differ from the NCX's";
         }
         if (list.size() < 2) {
             // getChaptersFromOpf: with fewer than 2 NCX chapters found, Moon+ reads the spine (or keeps the one chapter).
@@ -268,8 +279,8 @@ public final class MoonChapterAssembly {
             return "Moon+ picks its NCX by file name and would read another one than the OPF names";
         }
         if (epub.hasIrregularNcx()) {
-            return "the NCX has a shape Moon+ reads differently (a navPoint outside navPoint/navMap, a content "
-                    + "without src, or a %23 in a src)";
+            return "the NCX has a shape Moon+ reads differently (a navPoint outside navMap/navPoint, several contents, "
+                    + "a content with other attributes but no src, or a %23 in a src)";
         }
         if (epub.ncxTrusted()) {
             return null;
