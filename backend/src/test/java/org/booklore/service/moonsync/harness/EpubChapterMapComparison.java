@@ -1,7 +1,5 @@
 package org.booklore.service.moonsync.harness;
 
-import org.booklore.service.moonsync.position.epub.EpubContentException;
-import org.booklore.service.moonsync.position.epub.EpubPackage;
 import org.booklore.service.moonsync.position.epub.MoonChapterMap;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -28,32 +26,26 @@ final class EpubChapterMapComparison implements HarnessComparison {
 
     @Override
     public JsonNode run(HarnessInput input) {
-        ObjectNode out = JsonNodeFactory.instance.objectNode();
-        EpubPackage epub;
-        try {
-            epub = EpubPackage.read(input.path());
-        } catch (EpubContentException e) {
-            return out.put(JsonDiff.ERROR, e.getMessage());
-        }
-        MoonChapterMap map = new MoonChapterMap(epub);
-        int count = Math.max(epub.navPoints().map(List::size).orElse(0), epub.spineLength()) + 2;
-        ArrayNode chapters = out.putArray("chapters");
-        List<MoonChapterMap.SpineAnchor> relaxed = new ArrayList<>();
-        for (int c = 0; c < count; c++) {
-            Optional<MoonChapterMap.SpineAnchor> strictAnchor = map.resolveChapter(c, false);
-            Optional<MoonChapterMap.SpineAnchor> relaxedAnchor = map.resolveChapter(c, true);
-            relaxedAnchor.ifPresent(relaxed::add);
-            ObjectNode chapter = chapters.addObject();
-            chapter.set("strict", pair(strictAnchor.map(a -> new int[]{a.spineIndex(), a.anchorOffset()})));
-            chapter.set("relaxed", pair(relaxedAnchor.map(a -> new int[]{a.spineIndex(), a.anchorOffset()})));
-        }
-        ArrayNode reverse = out.putArray("reverse");
-        TreeMap<Integer, TreeSet<Integer>> probes = probes(epub.spineLength(), relaxed);
-        probes.forEach((spine, offsets) -> offsets.forEach(offset -> {
-            ObjectNode probe = reverse.addObject().put("spine", spine).put("offset", offset);
-            probe.set("result", pair(map.resolveSpinePosition(spine, offset).map(a -> new int[]{a.chapter(), a.anchorOffset()})));
-        }));
-        return out;
+        return EpubBooks.withEpub(input, (epub, out) -> {
+            MoonChapterMap map = new MoonChapterMap(epub);
+            int count = Math.max(epub.navPoints().map(List::size).orElse(0), epub.spineLength()) + 2;
+            ArrayNode chapters = out.putArray("chapters");
+            List<MoonChapterMap.SpineAnchor> relaxed = new ArrayList<>();
+            for (int c = 0; c < count; c++) {
+                Optional<MoonChapterMap.SpineAnchor> strictAnchor = map.resolveChapter(c, false);
+                Optional<MoonChapterMap.SpineAnchor> relaxedAnchor = map.resolveChapter(c, true);
+                relaxedAnchor.ifPresent(relaxed::add);
+                ObjectNode chapter = chapters.addObject();
+                chapter.set("strict", pair(strictAnchor.map(a -> new int[]{a.spineIndex(), a.anchorOffset()})));
+                chapter.set("relaxed", pair(relaxedAnchor.map(a -> new int[]{a.spineIndex(), a.anchorOffset()})));
+            }
+            ArrayNode reverse = out.putArray("reverse");
+            TreeMap<Integer, TreeSet<Integer>> probes = probes(epub.spineLength(), relaxed);
+            probes.forEach((spine, offsets) -> offsets.forEach(offset -> {
+                ObjectNode probe = reverse.addObject().put("spine", spine).put("offset", offset);
+                probe.set("result", pair(map.resolveSpinePosition(spine, offset).map(a -> new int[]{a.chapter(), a.anchorOffset()})));
+            }));
+        });
     }
 
     /** The reference's {@code probes}: 0 in every spine file, plus each relaxed anchor and its neighbours. */

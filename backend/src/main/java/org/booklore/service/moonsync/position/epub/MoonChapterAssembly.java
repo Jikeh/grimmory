@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 /**
  * The HTML of each Moon+ chapter, assembled the way Moon+ assembles it, so that Moon+'s chapter-relative offsets can
@@ -45,9 +46,11 @@ import java.util.Set;
  * <p>Not ported, so reported as unsupported rather than guessed: books Moon+ reads through an EPUB 3 nav document
  * instead of the NCX (no NCX, or an untrusted one, next to a declared nav), a one-navPoint NCX over at most two
  * spine files (Moon+ keeps it as its only chapter), and any chapter whose Moon+ number would differ from readsync's
- * (front matter one side counts and the other doesn't, or a navPoint Moon+ drops). Also not ported: Moon+ choosing
- * the nav over the NCX when both exist (the two normally agree), finding the NCX by file name, its tours and
- * single-chapter splitting ({@code trySplitChapters}), and dropping broken chapters ({@code deleteBrokenChapters}).
+ * (front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip, or chapters
+ * {@code deleteBrokenChapters} would drop). Chapters whose file is in the zip but not in the spine keep their numbers
+ * but have no text here. Also not ported: Moon+ choosing the nav over the NCX when both exist (the two normally
+ * agree), finding the NCX by file name (and files by name only), its tours and single-chapter splitting
+ * ({@code trySplitChapters}).
  */
 public final class MoonChapterAssembly {
 
@@ -64,6 +67,9 @@ public final class MoonChapterAssembly {
     }
 
     static final String PAGE_BREAK = "<hr2>";
+    private static final int OUTSIDE_SPINE = -1;
+    /** {@code Epub.getMaxHtmlSize} for EPUB: below it, Moon+ preloads ID chapters and drops broken ones. */
+    private static final long PRELOAD_MAX_BOOK_SIZE = 1_000_000;
     private static final int TEXT_BEFORE_TAG_RAW = 80;
 
     private final EpubPackage epub;
@@ -104,8 +110,8 @@ public final class MoonChapterAssembly {
         for (int i = 0; i < chapters.size(); i++) {
             Chapter chapter = chapters.get(i);
             if (chapter.number == number) {
-                if (i != number) {
-                    return Optional.empty(); // Moon+ would call it chapter i
+                if (i != number || chapter.spineIndex == OUTSIDE_SPINE) {
+                    return Optional.empty(); // Moon+ would call it chapter i, or its text isn't in the spine
                 }
                 try {
                     return Optional.of(new ChapterHtml(number, text(i)));
@@ -119,7 +125,15 @@ public final class MoonChapterAssembly {
 
     // ---- Moon+'s chapter list (getChaptersFromToc, getChaptersFromOpf, recheckChapters) ----
 
-    /** A Moon+ chapter. {@code number} is readsync's; its position in {@link #chapters} is Moon+'s. */
+    /** Spine indexes {@code from} to {@code to}, both exclusive. */
+    private record SpineRange(int from, int to) {
+    }
+
+    /**
+     * A Moon+ chapter. {@code number} is readsync's; its position in {@link #chapters} is Moon+'s. {@code spineIndex}
+     * is {@value #OUTSIDE_SPINE} for a navPoint whose file is in the zip but not in the spine: Moon+ keeps it as a
+     * chapter (and readsync's numbering counts it), but no spine file holds its text.
+     */
     private static final class Chapter {
         final int number;
         final int spineIndex;
@@ -131,8 +145,7 @@ public final class MoonChapterAssembly {
         /** Files appended eagerly ({@code additionalText}), in order. */
         final List<Integer> additional = new ArrayList<>();
         /** {@code #MORE#_from|to}: every spine file strictly between, appended when the chapter is read. */
-        int lazyFrom = -1;
-        int lazyTo = -1;
+        @Nullable SpineRange lazy;
         /** Front matter Moon+ inserts as chapter 0, already assembled. */
         @Nullable MappedHtml direct;
 
@@ -161,7 +174,7 @@ public final class MoonChapterAssembly {
             return null;
         }
         List<NavPoint> navPoints = epub.navPoints().orElseThrow();
-        int leading = readsyncLeadingOffset(navPoints.getFirst());
+        int leading = MoonChapterMap.leadingOffset(epub, navPoints.getFirst());
         boolean treeToc = false;
         boolean hasIdStr = false;
         for (int position = 0; position < navPoints.size(); position++) {
@@ -169,11 +182,12 @@ public final class MoonChapterAssembly {
             treeToc |= navPoint.depth() > 0;
             hasIdStr |= navPoint.fragment() != null;
             OptionalInt spineIndex = epub.ncxSpineIndex(navPoint.href());
-            if (spineIndex.isPresent()) {
-                list.add(new Chapter(position + leading, spineIndex.getAsInt(), navPoint.fragment(), navPoint.depth(), navPoint.label()));
+            if (spineIndex.isPresent() || epub.containsFile(navPoint.href())) {
+                list.add(new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), navPoint.fragment(),
+                        navPoint.depth(), navPoint.label()));
             }
         }
-        if (list.isEmpty()) {
+        if (list.stream().allMatch(c -> c.spineIndex == OUTSIDE_SPINE)) {
             return "no navPoint resolves to a spine file";
         }
         if (treeToc) {
@@ -206,16 +220,63 @@ public final class MoonChapterAssembly {
                     ? "Moon+ makes the front matter chapter 0, readsync doesn't: every chapter number differs by one"
                     : "readsync counts front matter as chapter 0, Moon+ doesn't: every chapter number differs by one";
         }
+        try {
+            assignFoundIds(list);
+            if (hasIdStr && list.size() < 60 && epub.fileSize() < PRELOAD_MAX_BOOK_SIZE) {
+                long broken = IntStream.range(0, list.size()).filter(i -> isBroken(list, i)).count();
+                if (broken > 2 && broken < list.size()) {
+                    return "Moon+ drops " + broken + " chapters whose anchors it can't find (deleteBrokenChapters), "
+                            + "renumbering the rest";
+                }
+            }
+        } catch (MissingFileException e) {
+            return e.getMessage();
+        }
         return null;
     }
 
-    /** readsync's {@code _leading_offset}: the numbering {@link MoonChapterMap} uses. */
-    private int readsyncLeadingOffset(NavPoint first) {
-        if (first.fragment() != null) {
-            return 1;
+    /**
+     * {@code getChapterTextWithIDTag}: when an ID chapter is followed by a chapter in the same file without an id,
+     * Moon+ cuts at the next similar id ({@link #similarIdPosition}) and gives that id to the next chapter, which from
+     * then on starts there. Moon+ does it as it reads the chapters in order (all of them up front when it preloads);
+     * here it is done once, in order.
+     */
+    private void assignFoundIds(List<Chapter> list) {
+        for (int i = 0; i < list.size() - 1; i++) {
+            Chapter chapter = list.get(i);
+            Chapter next = list.get(i + 1);
+            if (chapter.direct != null || chapter.fragment == null || next.fragment != null
+                    || next.spineIndex != chapter.spineIndex || chapter.spineIndex == OUTSIDE_SPINE) {
+                continue;
+            }
+            FileText file = file(chapter.spineIndex);
+            int idPos = startPosition(list, i, file);
+            if (idPos == -1) {
+                continue;
+            }
+            SimilarId similar = similarIdPosition(file.body(), chapter.fragment, idPos);
+            if (similar.position() == -1 || similar.quote() == 0) {
+                continue;
+            }
+            String body = file.body();
+            int open = body.indexOf(similar.quote(), similar.position());
+            int close = open == -1 ? -1 : body.indexOf(similar.quote(), open + 2);
+            if (open != -1 && close != -1) {
+                next.fragment = body.substring(open + 1, close);
+            }
         }
-        OptionalInt spineIndex = epub.ncxSpineIndex(first.href());
-        return spineIndex.isPresent() && spineIndex.getAsInt() > 0 ? 1 : 0;
+    }
+
+    /** {@code getChapterTextWithIDTag}'s broken chapter: id not found, after a chapter in the same file, nothing appended. */
+    private boolean isBroken(List<Chapter> list, int i) {
+        Chapter chapter = list.get(i);
+        if (chapter.direct != null || chapter.fragment == null || chapter.spineIndex == OUTSIDE_SPINE || i == 0) {
+            return false;
+        }
+        Chapter previous = list.get(i - 1);
+        return !previous.hasSubChapter && previous.spineIndex == chapter.spineIndex
+                && idPosition(file(chapter.spineIndex), chapter.fragment) == -1
+                && chapter.additional.isEmpty() && chapter.lazy == null;
     }
 
     /**
@@ -238,7 +299,7 @@ public final class MoonChapterAssembly {
                     }
                 }
             }
-            if (to - from > 1) {
+            if (from != OUTSIDE_SPINE && to != OUTSIDE_SPINE && to - from > 1) {
                 boolean lazy = to - from > 3;
                 for (int file = from + 1; file < to && file < epub.spineLength(); file++) {
                     if (claimed(list, file)) {
@@ -247,9 +308,8 @@ public final class MoonChapterAssembly {
                     chapter.usedFiles.add(file);
                     if (!lazy) {
                         chapter.additional.add(file);
-                    } else if (chapter.lazyFrom < 0) {
-                        chapter.lazyFrom = from;
-                        chapter.lazyTo = to;
+                    } else if (chapter.lazy == null) {
+                        chapter.lazy = new SpineRange(from, to);
                     }
                 }
             }
@@ -327,16 +387,7 @@ public final class MoonChapterAssembly {
         String text = file.body();
         String id = chapter.fragment;
         String nextId = i < chapters.size() - 1 ? chapters.get(i + 1).fragment : null;
-        int idPos = id == null ? 0 : idPosition(file, id);
-        if (idPos > 0 && i > 0 && chapters.get(i - 1).spineIndex != chapter.spineIndex) {
-            if (idPos > 500 || (idPos > 100 && idPos > text.length() / 4)) {
-                if (textBeforeTag(file, idPos, 20) == null) {
-                    idPos = 0;
-                }
-            } else {
-                idPos = 0;
-            }
-        }
+        int idPos = startPosition(chapters, i, file);
         if (idPos == -1) {
             if (i > 0 && !chapters.get(i - 1).hasSubChapter && chapters.get(i - 1).spineIndex == chapter.spineIndex) {
                 return new MappedHtml().appendSynthetic("<h2>" + chapter.label + "</h2>").append(additional(chapter));
@@ -355,7 +406,7 @@ public final class MoonChapterAssembly {
         if (i < chapters.size() - 1 && chapters.get(i + 1).spineIndex == chapter.spineIndex) {
             int nextPos = nextId != null ? idPosInHtml(text, nextId, idPos) : -1;
             if (nextPos == -1) {
-                nextPos = similarIdPosition(text, id, idPos);
+                nextPos = similarIdPosition(text, id, idPos).position();
             }
             if (nextPos != -1) {
                 end = text.lastIndexOf('<', nextPos);
@@ -375,7 +426,7 @@ public final class MoonChapterAssembly {
      * When the next chapter's id isn't found after this one, Moon+ cuts at the next element whose id shares this one's
      * prefix up to its first digit ({@code getIdPTagInHtml}), else at the next {@code  id=}.
      */
-    private static int similarIdPosition(String text, @Nullable String id, int from) {
+    private static SimilarId similarIdPosition(String text, @Nullable String id, int from) {
         String tag = idPTagInHtml(text, String.valueOf(id));
         int found = -1;
         if (tag != null) {
@@ -390,7 +441,32 @@ public final class MoonChapterAssembly {
                 found = text.indexOf(" " + tag, from);
             }
         }
-        return found == -1 ? text.indexOf(" id=", from) : found;
+        if (found == -1) {
+            found = text.indexOf(" id=", from);
+        }
+        char quote = tag == null ? 0 : tag.contains("\"") ? '"' : tag.contains("'") ? '\'' : 0;
+        return new SimilarId(found, quote);
+    }
+
+    /** Where the next similar id was found ({@code -1}: nowhere), and the quote its tag uses (0 when neither). */
+    private record SimilarId(int position, char quote) {
+    }
+
+    /**
+     * Where a chapter with a {@code #fragment} starts in its file's body (0 without one, -1 when the id isn't found):
+     * an anchor within the first 500 characters (or 100 and a quarter of the body) of a file the previous chapter
+     * isn't in counts as the body's start, and so does one whose head is too short to hand to the previous chapter.
+     */
+    private int startPosition(List<Chapter> list, int i, FileText file) {
+        Chapter chapter = list.get(i);
+        int idPos = chapter.fragment == null ? 0 : idPosition(file, chapter.fragment);
+        if (idPos > 0 && i > 0 && list.get(i - 1).spineIndex != chapter.spineIndex) {
+            boolean far = idPos > 500 || (idPos > 100 && idPos > file.body().length() / 4);
+            if (!far || textBeforeTag(file, idPos, 20) == null) {
+                idPos = 0;
+            }
+        }
+        return idPos;
     }
 
     /** {@code Epub.getIdPTagInHtml}, including its {@code != 1} comparisons (so it nearly always answers {@code id="…"}). */
@@ -489,8 +565,8 @@ public final class MoonChapterAssembly {
 
     private MappedHtml additional(Chapter chapter) {
         MappedHtml html = new MappedHtml();
-        if (chapter.lazyFrom >= 0) {
-            for (int file = chapter.lazyFrom + 1; file < chapter.lazyTo && file < epub.spineLength(); file++) {
+        if (chapter.lazy != null) {
+            for (int file = chapter.lazy.from() + 1; file < chapter.lazy.to() && file < epub.spineLength(); file++) {
                 appendFile(html, file);
             }
         } else {
@@ -546,6 +622,10 @@ public final class MoonChapterAssembly {
     // ---- Files ----
 
     /** A spine file's whole text and where Moon+'s {@code T.getHtmlBody} finds its body. */
+    /** {@code [start, end)} in a file's text. */
+    record BodyRange(int start, int end) {
+    }
+
     private record FileText(int spineIndex, String name, String full, int bodyStart, int bodyEnd) {
 
         String body() {
@@ -566,32 +646,35 @@ public final class MoonChapterAssembly {
         }
         String path = EpubPackage.percentDecode(epub.spinePath(spineIndex));
         String name = path.substring(path.lastIndexOf('/') + 1);
-        int[] body = htmlBody(full);
-        return Optional.of(new FileText(spineIndex, name, full, body[0], body[1]));
+        BodyRange body = htmlBody(full);
+        return Optional.of(new FileText(spineIndex, name, full, body.start(), body.end()));
     }
 
     /** {@code T.getHtmlBody}: between {@code <body…>} and the next {@code </body>}, else inside {@code <html…>}, else all. */
-    static int[] htmlBody(String html) {
+    static BodyRange htmlBody(String html) {
         String lower = html.toLowerCase(Locale.ROOT);
         if (lower.length() != html.length()) {
             lower = html;
         }
-        int body = lower.indexOf("<body");
-        if (body != -1) {
-            int gt = lower.indexOf('>', body);
-            int close = lower.indexOf("</body>", gt);
-            return close != -1 ? new int[]{gt + 1, close} : new int[]{gt + 1, html.length()};
+        BodyRange body = between(html, lower, "<body", "</body>");
+        if (body == null) {
+            body = between(html, lower, "<html", "</html>");
         }
-        int root = lower.indexOf("<html");
-        if (root != -1) {
-            int gt = lower.indexOf('>', root);
-            int close = lower.indexOf("</html>", gt);
-            return close != -1 ? new int[]{gt + 1, close} : new int[]{gt + 1, html.length()};
-        }
-        return new int[]{0, html.length()};
+        return body != null ? body : new BodyRange(0, html.length());
     }
 
-    private static final class MissingFileException extends RuntimeException {
+    /** After the first {@code open…>} up to the next {@code close} (or the end); null without {@code open}. */
+    private static @Nullable BodyRange between(String html, String lower, String open, String close) {
+        int tag = lower.indexOf(open);
+        if (tag == -1) {
+            return null;
+        }
+        int gt = lower.indexOf('>', tag);
+        int end = lower.indexOf(close, gt);
+        return new BodyRange(gt + 1, end != -1 ? end : html.length());
+    }
+
+    private static final class MissingFileException extends EpubContentException {
         MissingFileException(int spineIndex) {
             super("spine file " + spineIndex + " can't be read");
         }

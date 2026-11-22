@@ -19,6 +19,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -71,14 +72,16 @@ public final class EpubPackage {
     private final List<String> spineHrefs;
     private final @Nullable List<NavPoint> navPoints;
     private final boolean epub3Nav;
+    private final List<String> entryNames;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
-                        boolean epub3Nav) {
+                        boolean epub3Nav, List<String> entryNames) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
         this.navPoints = navPoints;
         this.epub3Nav = epub3Nav;
+        this.entryNames = entryNames;
     }
 
     /**
@@ -93,7 +96,8 @@ public final class EpubPackage {
             Document opf = parseXml(readEntry(zip, opfPath));
             List<String> spine = parseSpineHrefs(opf);
             List<NavPoint> navPoints = parseNavPoints(zip, opf, opfDir);
-            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf));
+            List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
+            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names);
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -172,6 +176,25 @@ public final class EpubPackage {
      */
     public boolean declaresNavDocument() {
         return epub3Nav;
+    }
+
+    /** The EPUB file's size in bytes (Moon+ decides some chapter handling by it). */
+    public long fileSize() {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            throw new EpubContentException("can't read the size of " + file.getFileName(), e);
+        }
+    }
+
+    /**
+     * Whether the zip holds a file with this href's file name, in any folder: how Moon+ finds a navPoint's file
+     * ({@code Epub.getChapter}, by file name first), so it keeps navPoints into files outside the spine.
+     */
+    public boolean containsFile(String href) {
+        String decoded = percentDecode(href);
+        String name = decoded.substring(decoded.lastIndexOf('/') + 1);
+        return !name.isEmpty() && entryNames.stream().anyMatch(e -> e.equals(name) || e.endsWith("/" + name));
     }
 
     /** The spine index of an NCX href (fragment already removed), comparing both sides percent-decoded. */

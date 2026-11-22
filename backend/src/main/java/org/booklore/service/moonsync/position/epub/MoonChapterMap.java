@@ -137,7 +137,7 @@ public final class MoonChapterMap {
             return null;
         }
         Map<Integer, Chapter> map = new LinkedHashMap<>();
-        int leading = leadingOffset(navPoints.getFirst());
+        int leading = leadingOffset(epub, navPoints.getFirst());
         if (leading > 0) {
             map.put(0, new Chapter(0, 0, isSingleChunk(0)));
         }
@@ -166,7 +166,7 @@ public final class MoonChapterMap {
      * one), else 0. readsync's {@code _leading_offset}: Dorian Gray's uncovered cover page makes its 12th navPoint
      * chapter 12; Cloud Atlas's navPoint on its first file makes its 63rd navPoint chapter 62.
      */
-    private int leadingOffset(NavPoint first) {
+    static int leadingOffset(EpubPackage epub, NavPoint first) {
         if (first.fragment() != null) {
             return 1;
         }

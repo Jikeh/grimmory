@@ -10,6 +10,7 @@ import org.jsoup.parser.Parser;
 import org.jsoup.select.NodeTraversor;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -179,7 +180,7 @@ public final class MoonHtml {
                 found.add(text);
             }
         }, document);
-        found.sort(java.util.Comparator.comparingInt(t -> t.sourceRange().startPos()));
+        found.sort(Comparator.comparingInt(t -> t.sourceRange().startPos()));
         return found;
     }
 

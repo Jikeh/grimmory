@@ -1,6 +1,7 @@
 package org.booklore.service.moonsync.position.epub;
 
 import org.jsoup.nodes.Document;
+import org.jspecify.annotations.Nullable;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.nodes.TextNode;
@@ -31,6 +32,8 @@ public final class ChapterText {
 
     private final Document document;
     private final List<Segment> segments;
+    /** Every node's position in document order, built on the first anchor lookup. */
+    private @Nullable Map<Node, Integer> order;
 
     private ChapterText(Document document, List<Segment> segments) {
         this.document = document;
@@ -90,9 +93,12 @@ public final class ChapterText {
         if (target == null) {
             return Optional.empty();
         }
-        Map<Node, Integer> order = new IdentityHashMap<>();
-        int[] next = {0};
-        NodeTraversor.traverse((node, depth) -> order.put(node, next[0]++), document);
+        if (order == null) {
+            Map<Node, Integer> positions = new IdentityHashMap<>();
+            int[] next = {0};
+            NodeTraversor.traverse((node, depth) -> positions.put(node, next[0]++), document);
+            order = positions;
+        }
         int targetOrder = order.get(target);
         for (Segment segment : segments) {
             if (order.get(segment.node()) > targetOrder) {

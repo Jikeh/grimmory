@@ -13,6 +13,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assumptions.assumeThat;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.booklore.service.moonsync.position.epub.TestEpubs.CONTAINER_XML;
 
 /**
@@ -123,9 +124,9 @@ class EpubPackageTest {
         List<NavPoint> navPoints = EpubPackage.read(bookWithNcx(TOC_NCX)).navPoints().orElseThrow();
         assertThat(navPoints).extracting(NavPoint::playOrder, NavPoint::href, NavPoint::fragment, NavPoint::depth)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(BigInteger.ONE, "text/chapter1.xhtml", null, 0),
-                        org.assertj.core.groups.Tuple.tuple(BigInteger.TWO, "text/chapter1.xhtml", "heading_2", 1),
-                        org.assertj.core.groups.Tuple.tuple(BigInteger.valueOf(3), "text/chapter2.xhtml", null, 0));
+                        tuple(BigInteger.ONE, "text/chapter1.xhtml", null, 0),
+                        tuple(BigInteger.TWO, "text/chapter1.xhtml", "heading_2", 1),
+                        tuple(BigInteger.valueOf(3), "text/chapter2.xhtml", null, 0));
         assertThat(navPoints).extracting(NavPoint::label).containsExactly("Chapter one", "Chapter one, part two", "Chapter two");
     }
 

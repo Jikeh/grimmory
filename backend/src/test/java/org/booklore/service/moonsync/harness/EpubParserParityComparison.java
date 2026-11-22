@@ -2,7 +2,6 @@ package org.booklore.service.moonsync.harness;
 
 import org.booklore.service.moonsync.position.epub.ChapterText;
 import org.booklore.service.moonsync.position.epub.EpubContentException;
-import org.booklore.service.moonsync.position.epub.EpubPackage;
 import org.booklore.service.moonsync.position.epub.MoonHtml;
 import org.jsoup.nodes.DataNode;
 import org.jsoup.nodes.Document;
@@ -45,25 +44,19 @@ final class EpubParserParityComparison implements HarnessComparison {
 
     @Override
     public JsonNode run(HarnessInput input) {
-        ObjectNode out = JsonNodeFactory.instance.objectNode();
-        EpubPackage epub;
-        try {
-            epub = EpubPackage.read(input.path());
-        } catch (EpubContentException e) {
-            return out.put(JsonDiff.ERROR, e.getMessage());
-        }
-        ArrayNode files = out.putArray("files");
-        for (int i = 0; i < epub.spineLength(); i++) {
-            String html;
-            try {
-                html = epub.spineContent(i);
-            } catch (EpubContentException e) {
-                files.addNull();
-                continue;
+        return EpubBooks.withEpub(input, (epub, out) -> {
+            ArrayNode files = out.putArray("files");
+            for (int i = 0; i < epub.spineLength(); i++) {
+                String html;
+                try {
+                    html = epub.spineContent(i);
+                } catch (EpubContentException e) {
+                    files.addNull();
+                    continue;
+                }
+                files.add(signature(MoonHtml.parse(html)));
             }
-            files.add(signature(MoonHtml.parse(html)));
-        }
-        return out;
+        });
     }
 
     static ObjectNode signature(Document document) {

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
@@ -200,6 +201,43 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void aNavPointIntoAFileOutsideTheSpineKeepsItsNumberAndStopsTheChapterBefore() {
+        // Moon+ finds x.xhtml in the zip and keeps the navPoint; its spine index is -1, so the chapter before it gets no
+        // following files (checkChapterAdditionalText returns early).
+        Map<String, String> files = files("a.xhtml", body("<p>a</p>"), "notes.xhtml", body("<p>notes</p>"),
+                "b.xhtml", body("<p>b</p>"));
+        String opf = TestEpubs.opf(true, "a.xhtml", "notes.xhtml", "b.xhtml");
+        Map<String, String> zip = new LinkedHashMap<>(files);
+        zip.put("x.xhtml", body("<p>x</p>"));
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir, opf,
+                TestEpubs.ncx(np("1", "a.xhtml") + np("2", "x.xhtml") + np("3", "b.xhtml")), zip)));
+        assertThat(html(assembly, 0)).isEqualTo("<p>a</p>");
+        assertThat(assembly.chapter(1)).isEmpty();
+        assertThat(html(assembly, 2)).isEqualTo("<p>b</p>");
+    }
+
+    @Test
+    void anIdChapterGivesTheSimilarIdItCutsAtToTheNextChapterInItsFile() {
+        // getChapterTextWithIDTag: the next chapter is in the same file without an id, so Moon+ cuts at the next
+        // "id=\"p…" and from then on starts the next chapter there.
+        String head = "<p>" + "h".repeat(600) + "</p>";
+        MoonChapterAssembly assembly = book(np("1", "b.xhtml") + np("2", "a.xhtml#p1") + np("3", "a.xhtml"), files(
+                "b.xhtml", body("<p>b</p>"),
+                "a.xhtml", body(head + "<h2 id=\"p1\">one</h2><p>x</p><h2 id=\"p2\">two</h2><p>y</p>")));
+        assertThat(html(assembly, 1)).isEqualTo("<h2 id=\"p1\">one</h2><p>x</p>");
+        assertThat(html(assembly, 2)).isEqualTo("<h2 id=\"p2\">two</h2><p>y</p>");
+    }
+
+    @Test
+    void chaptersMoonDropsAsBrokenMakeTheBookUnsupported() {
+        // deleteBrokenChapters: more than two ID chapters whose id isn't found, after a chapter in the same file, are
+        // removed in a small book, which renumbers everything after them.
+        MoonChapterAssembly assembly = book(np("1", "a.xhtml") + np("2", "a.xhtml#m1") + np("3", "a.xhtml#m2")
+                + np("4", "a.xhtml#m3") + np("5", "b.xhtml"), files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>")));
+        assertThat(assembly.unsupportedReason()).hasValueSatisfying(r -> assertThat(r).contains("deleteBrokenChapters"));
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),
@@ -265,7 +303,7 @@ class MoonChapterAssemblyTest {
         ChapterHtml indice = MoonChapterAssembly.of(EpubPackage.read(book)).chapter(40).orElseThrow();
         // indice.xhtml, then every spine file after it: pre, the 36 chapters, the glossary and the series list.
         assertThat(indice.pieces().stream().filter(p -> !p.synthetic()).map(MappedHtml.Piece::spineIndex).toList())
-                .isEqualTo(java.util.stream.IntStream.range(3, 43).boxed().toList());
+                .isEqualTo(IntStream.range(3, 43).boxed().toList());
         assertThat(MoonSplit.chunkCount(indice.html())).isEqualTo(3); // end of book: 40@2#65889
     }
 
