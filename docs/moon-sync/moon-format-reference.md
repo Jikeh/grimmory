@@ -90,13 +90,16 @@ changed; the `.po` only when the position changed, except on a forced "Sync to c
   - Not ported (reported as unsupported, never guessed): books whose NCX Moon+ picks by file name differently from
     the OPF, or reads where readsync can't (not named in the OPF, no namespace), or reads differently (a navPoint
     outside `navMap`/`navPoint`, several `content`s, a `content` with other attributes but no `src`, a `%23` in a
-    `src`); books Moon+ reads through an EPUB 3 nav document (no usable NCX, a nav at least as long as the NCX
-    whose entries differ, or a nav only Moon+ can repair: it re-parses a file with bare `&`s escaped); when the nav
-    wins with the same entries, its labels and nesting are used; a one-navPoint NCX over at most two spine files; and books whose Moon+ chapter numbers differ from
+    `src`); books Moon+ reads through an EPUB 3 nav document (no usable NCX; a nav at least as long as the NCX
+    whose entries differ, or that ends at an `<a>` without `href`; a nav that doesn't parse here, which Moon+'s parser
+    may still read); a one-navPoint NCX over at most two spine files; and books whose Moon+ chapter numbers differ from
     readsync's: front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip or whose
     label has no text, a bare `#`, fewer than two resolving navPoints, or chapters `deleteBrokenChapters` drops.
     [decompiled `Epub.getTocFilename`, `addNCXChapters`, `getCName`, `getChapter`, `getChaptersFromOpf`,
     `recheckChapters`]
+
+  - When Moon+ takes the EPUB 3 nav over the NCX (a nav at least as long, with the same entries), the chapters
+    carry the nav's labels and nesting. [decompiled `Epub.getChapters`, `addEpub3NCXChapters`]
 
 ### `split`: chunk of an oversized chapter
 

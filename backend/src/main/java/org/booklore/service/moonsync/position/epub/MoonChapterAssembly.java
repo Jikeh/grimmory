@@ -208,7 +208,7 @@ public final class MoonChapterAssembly {
                 String fragment = navPoint.fragment() == null ? null : EpubPackage.percentDecode(navPoint.fragment());
                 Chapter chapter = new Chapter(position + leading, spineIndex.orElse(OUTSIDE_SPINE), fragment,
                         navPoint.depth(), navPoint.label());
-                chapter.tocEntry = EpubPackage.tocEntry(navPoint.href(), navPoint.bareHash() ? "" : fragment);
+                chapter.tocEntry = EpubPackage.tocEntry(navPoint.href(), navPoint.fragment());
                 list.add(chapter);
             }
         }
@@ -221,6 +221,9 @@ public final class MoonChapterAssembly {
         if (nav.size() >= list.size()) {
             List<String> navTargets = nav.stream().map(EpubPackage.NavTocEntry::target).toList();
             List<String> ncxTargets = list.stream().map(c -> c.tocEntry).toList();
+            if (epub.navTruncated()) {
+                return "Moon+ numbers this book by an EPUB 3 nav it stops reading at an <a> without href";
+            }
             if (!navTargets.equals(ncxTargets)) {
                 return "Moon+ numbers this book by its EPUB 3 nav, whose entries differ from the NCX's";
             }
@@ -288,8 +291,8 @@ public final class MoonChapterAssembly {
         if (epub.moonReadsAnotherNcx()) {
             return "Moon+ picks its NCX by file name and would read another one than the OPF names";
         }
-        if (epub.navRepairedByMoon()) {
-            return "the EPUB 3 nav has a bare '&': Moon+ repairs and may read it, this port can't tell";
+        if (epub.navUnreadable()) {
+            return "the EPUB 3 nav doesn't parse here; Moon+ may read it (its parser differs, and it repairs bare '&')";
         }
         if (epub.hasIrregularNcx()) {
             return "the NCX has a shape Moon+ reads differently (a navPoint outside navMap/navPoint, several contents, "

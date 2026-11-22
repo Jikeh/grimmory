@@ -333,6 +333,19 @@ class MoonChapterAssemblyTest {
                 .as("an encoded space is not a #").isEmpty();
     }
 
+    @Test
+    void aNavWithAnUndeclaredPrefixIsReadAsMoonsPlainParserReadsIt() {
+        // Moon+'s getDocument isn't namespace-aware, so epub:type without xmlns:epub still parses there.
+        String opf = TestEpubs.opf(true, "a.xhtml", "b.xhtml").replace("</manifest>",
+                "<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/></manifest>");
+        String nav = "<html><body><nav epub:type=\"toc\"><ol><li><a href=\"a.xhtml\">A</a></li><li><a href=\"b.xhtml\">B</a></li>"
+                + "<li><a href=\"b.xhtml#x\">X</a></li></ol></nav></body></html>";
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir, opf,
+                TestEpubs.ncx(np("1", "a.xhtml") + np("2", "b.xhtml")),
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<h2 id=\"x\">b</h2>"), "nav.xhtml", nav))));
+        assertThat(assembly.unsupportedReason()).hasValueSatisfying(r -> assertThat(r).contains("entries differ"));
+    }
+
     private MoonChapterAssembly bookWithNav(String navItems) {
         String opf = TestEpubs.opf(true, "a.xhtml", "b.xhtml").replace("</manifest>",
                 "  <item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/></manifest>");

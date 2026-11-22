@@ -65,13 +65,13 @@ public final class EpubPackage {
     private static final String NCX_NS = "http://www.daisy.org/z3986/2005/ncx/";
     private static final String NCX_MEDIA_TYPE = "application/x-dtbncx+xml";
     private static final Charset ZIP_NAME_FALLBACK = Charset.forName("IBM437");
-    /** An {@code &} that doesn't start a character or entity reference. */
-    private static final Pattern BARE_AMPERSAND = Pattern.compile("&(?![#A-Za-z0-9]+;)");
     /** A {@code navPoint} start tag, with or without a prefix, in lower-cased text. */
     private static final Pattern NAV_POINT_TAG = Pattern.compile("<(?:[a-z0-9_.-]+:)?navpoint[\\s>/]");
     /** Python's {@code int()}: optional surrounding whitespace and sign, decimal digits, single underscores between. */
     private static final Pattern PYTHON_INT = Pattern.compile("([+-]?)(\\p{Nd}+(?:_\\p{Nd}+)*)");
-    private static final DocumentBuilderFactory XML = xmlFactory();
+    private static final DocumentBuilderFactory XML = xmlFactory(true);
+    /** Moon+'s {@code Epub.getDocument}: a default, not namespace-aware parser (used for the nav, which only it reads). */
+    private static final DocumentBuilderFactory PLAIN_XML = xmlFactory(false);
 
     private final Path file;
     private final String opfDir;
@@ -84,7 +84,8 @@ public final class EpubPackage {
     private final int moonNavPoints;
     private final boolean irregularNcx;
     private final List<NavTocEntry> navTocEntries;
-    private final boolean navRepairedByMoon;
+    private final boolean navUnreadable;
+    private final boolean navTruncated;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
                         boolean moonNavDocument, List<String> entryNames, @Nullable String ncxEntry,
@@ -101,7 +102,8 @@ public final class EpubPackage {
         this.moonNavPoints = moonNavPoints;
         this.irregularNcx = irregularNcx;
         this.navTocEntries = nav.entries();
-        this.navRepairedByMoon = nav.repairedByMoon();
+        this.navUnreadable = nav.unreadable();
+        this.navTruncated = nav.truncated();
     }
 
     /**
@@ -126,7 +128,7 @@ public final class EpubPackage {
             int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
             return new EpubPackage(file, opfDir, spine, navPoints, navEntry != null, names,
                     ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints, read.irregular(),
-                    navEntry == null ? new NavRead(List.of(), false) : readNavToc(zip, navEntry, names));
+                    navEntry == null ? new NavRead(List.of(), false, false) : readNavToc(zip, navEntry, names));
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -213,7 +215,7 @@ public final class EpubPackage {
      * readsync does), or none can be told: a zip with {@code .ncx} files but no single one Moon+ would pick.
      */
     public boolean moonReadsAnotherNcx() {
-        boolean anyNcx = entryNames.stream().anyMatch(n -> n.toLowerCase(Locale.ROOT).endsWith(".ncx"));
+        boolean anyNcx = entryNames.stream().anyMatch(EpubPackage::isNcxName);
         return anyNcx ? !Objects.equals(moonNcx, ncxEntry) : ncxEntry != null;
     }
 
@@ -258,23 +260,31 @@ public final class EpubPackage {
     }
 
     /**
-     * Whether the nav document doesn't parse here but Moon+ would read it: {@code Epub.getDocument} parses a file
-     * again with every bare {@code &} escaped when the parser reports an unterminated entity reference. The nav's
-     * entries are then unknown here ({@link #navTocEntries()} is empty).
+     * Whether the nav document Moon+ finds doesn't parse here. Moon+ may still read it: Android's parser accepts other
+     * input than this one, and {@code Epub.getDocument} parses a file again with bare {@code &}s escaped. Its entries
+     * are then unknown ({@link #navTocEntries()} is empty).
      */
-    public boolean navRepairedByMoon() {
-        return navRepairedByMoon;
+    public boolean navUnreadable() {
+        return navUnreadable;
     }
 
-    /** A nav's entries, and whether it failed to parse in a way Moon+ repairs. */
-    private record NavRead(List<NavTocEntry> entries, boolean repairedByMoon) {
+    /**
+     * Whether an {@code a} without {@code href} cut the nav read short: Moon+'s exception there also skips its
+     * {@code treeTOC} pass, so a nav that still wins would carry nesting this port doesn't reproduce.
+     */
+    public boolean navTruncated() {
+        return navTruncated;
+    }
+
+    /** A nav's entries; whether it failed to parse; whether an {@code a} without {@code href} ended the read. */
+    private record NavRead(List<NavTocEntry> entries, boolean unreadable, boolean truncated) {
     }
 
     /**
      * An NCX or nav target: the file's base name, then {@code #} and the fragment when the href has a {@code #} (even
      * an empty one, which Moon+ reads as an empty id), both percent-decoded.
      */
-    public static String tocEntry(String href, @Nullable String fragment) {
+    static String tocEntry(String href, @Nullable String fragment) {
         return target(baseName(percentDecode(href)), fragment == null ? null : percentDecode(fragment));
     }
 
@@ -307,17 +317,15 @@ public final class EpubPackage {
     }
 
     private static NavRead readNavToc(ZipFile zip, ZipEntry entry, List<String> names) throws IOException {
-        byte[] bytes = read(zip, entry);
         Document nav;
         try {
-            nav = parseXml(bytes);
+            nav = parseXml(read(zip, entry), PLAIN_XML);
         } catch (SAXException e) {
-            // Moon+'s parse fails too and it keeps the NCX, unless a bare '&' lets it repair the file.
-            return new NavRead(List.of(), BARE_AMPERSAND.matcher(new String(bytes, StandardCharsets.UTF_8)).find());
+            return new NavRead(List.of(), true, false);
         }
         NodeList navs = nav.getElementsByTagName("nav");
         if (navs.getLength() == 0) {
-            return new NavRead(List.of(), false);
+            return new NavRead(List.of(), false, false);
         }
         Element toc = (Element) navs.item(0);
         if (navs.getLength() > 1) {
@@ -333,12 +341,11 @@ public final class EpubPackage {
             }
         }
         List<NavTocEntry> entries = new ArrayList<>();
-        for (Node ol = toc.getFirstChild(); ol != null; ol = ol.getNextSibling()) {
-            if ("ol".equals(ol.getNodeName()) && !navListItems(ol, 0, names, entries)) {
-                break;
-            }
+        boolean truncated = false;
+        for (Node ol = toc.getFirstChild(); ol != null && !truncated; ol = ol.getNextSibling()) {
+            truncated = "ol".equals(ol.getNodeName()) && !navListItems(ol, 0, names, entries);
         }
-        return new NavRead(List.copyOf(entries), false);
+        return new NavRead(List.copyOf(entries), false, truncated);
     }
 
     /**
@@ -376,6 +383,10 @@ public final class EpubPackage {
      * else its only entry ending in {@code toc.ncx}, ignoring case; else its only {@code .ncx}. Null when there is none,
      * or several tie (Moon+'s pick then depends on its sorted file list).
      */
+    private static boolean isNcxName(String name) {
+        return name.toLowerCase(Locale.ROOT).endsWith(".ncx");
+    }
+
     private static @Nullable String moonNcxEntry(List<String> names) {
         List<String> exact = names.stream().filter(n -> baseName(n).equals("toc.ncx")).toList();
         if (exact.size() == 1) {
@@ -388,7 +399,7 @@ public final class EpubPackage {
         if (!toc.isEmpty()) {
             return toc.size() == 1 ? toc.getFirst() : null;
         }
-        List<String> ncx = names.stream().filter(n -> n.toLowerCase(Locale.ROOT).endsWith(".ncx")).toList();
+        List<String> ncx = names.stream().filter(EpubPackage::isNcxName).toList();
         return ncx.size() == 1 ? ncx.getFirst() : null;
     }
 
@@ -679,16 +690,20 @@ public final class EpubPackage {
     }
 
     private static Document parseXml(byte[] xml) throws IOException, SAXException {
+        return parseXml(xml, XML);
+    }
+
+    private static Document parseXml(byte[] xml, DocumentBuilderFactory factory) throws IOException, SAXException {
         try {
-            return XML.newDocumentBuilder().parse(new ByteArrayInputStream(xml));
+            return factory.newDocumentBuilder().parse(new ByteArrayInputStream(xml));
         } catch (ParserConfigurationException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private static DocumentBuilderFactory xmlFactory() {
+    private static DocumentBuilderFactory xmlFactory(boolean namespaceAware) {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
+        factory.setNamespaceAware(namespaceAware);
         try {
             factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
             factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
