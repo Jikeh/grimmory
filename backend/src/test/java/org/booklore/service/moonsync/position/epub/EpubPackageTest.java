@@ -245,6 +245,22 @@ class EpubPackageTest {
         assertThat(EpubPackage.read(plainBook()).hasMoonNavDocument()).isFalse();
     }
 
+    @Test
+    void theNavFileIsLookedUpAsMoonLooksItUp() {
+        // By unique base name first, never relative to the package document: "../nav.xhtml" is found at the zip root.
+        String opf = TestEpubs.opf(false, "a.xhtml").replace("</manifest>",
+                "<item id=\"nav\" href=\"../nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/></manifest>");
+        Map<String, String> entries = new LinkedHashMap<>();
+        entries.put("META-INF/container.xml", CONTAINER_XML);
+        entries.put("OEBPS/content.opf", opf);
+        entries.put("OEBPS/a.xhtml", "<p>a</p>");
+        entries.put("nav.xhtml", "<html><body><nav><ol/></nav></body></html>");
+        assertThat(EpubPackage.read(TestEpubs.zip(dir, "book.epub", entries)).hasMoonNavDocument()).isTrue();
+        // The base-name lookup is case-sensitive.
+        entries.put("OEBPS/content.opf", opf.replace("../nav.xhtml", "NAV.xhtml"));
+        assertThat(EpubPackage.read(TestEpubs.zip(dir, "book.epub", entries)).hasMoonNavDocument()).isFalse();
+    }
+
     // --- Real fixtures (readsync's, not committed here) ---
 
     @Test

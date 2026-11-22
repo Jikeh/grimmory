@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -123,7 +124,7 @@ public final class EpubPackage {
             NcxRead read = ncx == null ? new NcxRead(null, false) : readNcx(zip, ncx);
             List<NavPoint> navPoints = read.navPoints();
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
-            ZipEntry navEntry = moonNavEntry(zip, new String(opfBytes, StandardCharsets.UTF_8), opfDir, names);
+            ZipEntry navEntry = moonNavEntry(zip, new String(opfBytes, StandardCharsets.UTF_8), names);
             String moonNcx = moonNcxEntry(names);
             int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
             return new EpubPackage(file, opfDir, spine, navPoints, navEntry != null, names,
@@ -293,7 +294,7 @@ public final class EpubPackage {
     }
 
     /** {@code Epub.getTocFilenameEpub3}: the entry named by the tag holding the literal {@code properties="nav"}. */
-    private static @Nullable ZipEntry moonNavEntry(ZipFile zip, String opf, String opfDir, List<String> names) {
+    private static @Nullable ZipEntry moonNavEntry(ZipFile zip, String opf, List<String> names) {
         int at = opf.indexOf("properties=\"nav\"");
         int tagStart = at < 0 ? -1 : opf.lastIndexOf('<', at);
         int tagEnd = at < 0 ? -1 : opf.indexOf('>', at);
@@ -308,12 +309,40 @@ public final class EpubPackage {
             return null;
         }
         String href = tag.substring(hrefAt + 6, hrefEnd);
-        ZipEntry entry = findEntry(zip, resolveRelative(opfDir, href));
-        if (entry == null) {
-            // Moon+'s own fallback: any entry whose path ends with the href as written (not by base name).
-            entry = names.stream().filter(n -> n.endsWith(href)).findFirst().map(zip::getEntry).orElse(null);
+        String name = moonFileLookup(names, href);
+        return name == null ? null : zip.getEntry(name);
+    }
+
+    /**
+     * How {@code getTocFilenameEpub3} finds a file (never relative to the package document): the zip's only entry with
+     * the href's base name (case-sensitive; {@code getPureFilenameCache} drops names that occur twice); else the last
+     * entry, in Moon+'s file order (folder, then lower-cased name), whose path ends with the href as written; else,
+     * for an href with a folder, the last entry with its base name.
+     */
+    private static @Nullable String moonFileLookup(List<String> names, String href) {
+        String base = baseName(href);
+        List<String> sameBase = names.stream().filter(n -> baseName(n).equals(base)).toList();
+        if (sameBase.size() == 1) {
+            return sameBase.getFirst();
         }
-        return entry;
+        List<String> ordered = names.stream()
+                .sorted(Comparator.comparing((String n) -> n.substring(0, Math.max(0, n.lastIndexOf('/'))))
+                        .thenComparing(n -> n.toLowerCase(Locale.ROOT)))
+                .toList()
+                .reversed();
+        for (String name : ordered) {
+            if (name.endsWith(href)) {
+                return name;
+            }
+        }
+        if (href.contains("/")) {
+            for (String name : ordered) {
+                if (name.equals(base) || name.endsWith("/" + base)) {
+                    return name;
+                }
+            }
+        }
+        return null;
     }
 
     private static NavRead readNavToc(ZipFile zip, ZipEntry entry, List<String> names) throws IOException {
@@ -383,9 +412,6 @@ public final class EpubPackage {
      * else its only entry ending in {@code toc.ncx}, ignoring case; else its only {@code .ncx}. Null when there is none,
      * or several tie (Moon+'s pick then depends on its sorted file list).
      */
-    private static boolean isNcxName(String name) {
-        return name.toLowerCase(Locale.ROOT).endsWith(".ncx");
-    }
 
     private static @Nullable String moonNcxEntry(List<String> names) {
         List<String> exact = names.stream().filter(n -> baseName(n).equals("toc.ncx")).toList();
@@ -401,6 +427,10 @@ public final class EpubPackage {
         }
         List<String> ncx = names.stream().filter(EpubPackage::isNcxName).toList();
         return ncx.size() == 1 ? ncx.getFirst() : null;
+    }
+
+    private static boolean isNcxName(String name) {
+        return name.toLowerCase(Locale.ROOT).endsWith(".ncx");
     }
 
     private static int countNavPointTags(ZipFile zip, String name) throws IOException {
