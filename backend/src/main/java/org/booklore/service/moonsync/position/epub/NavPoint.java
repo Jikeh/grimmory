@@ -19,7 +19,10 @@ import java.math.BigInteger;
  * @param label     its {@code navLabel/text}, line breaks removed and trimmed as Moon+ does; {@code ""} without one
  * @param bareHash  {@code content/@src} ends in a {@code #} with nothing after it: no fragment for readsync (and
  *                  {@link #fragment()}), an empty id for Moon+
+ * @param labelless it has a {@code navLabel} whose {@code text} is missing or holds no text node first: Moon+'s
+ *                  {@code getCName} answers null and {@code getChapter} then skips the navPoint (one without any
+ *                  {@code navLabel} is kept, with label {@code ""})
  */
 public record NavPoint(@Nullable BigInteger playOrder, String href, @Nullable String fragment, int depth, String label,
-                       boolean bareHash) {
+                       boolean bareHash, boolean labelless) {
 }

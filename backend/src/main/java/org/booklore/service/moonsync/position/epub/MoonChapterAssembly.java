@@ -185,6 +185,9 @@ public final class MoonChapterAssembly {
             return null;
         }
         List<NavPoint> navPoints = epub.navPoints().orElseThrow();
+        if (epub.moonReadsAnotherNcx()) {
+            return "Moon+ picks its NCX by file name and would read another one than the OPF names";
+        }
         int leading = MoonChapterMap.leadingOffset(epub, navPoints.getFirst());
         boolean treeToc = false;
         boolean hasIdStr = false;
@@ -196,6 +199,9 @@ public final class MoonChapterAssembly {
             if (spineIndex.isPresent() || epub.containsFile(navPoint.href())) {
                 if (navPoint.bareHash()) {
                     return "a navPoint ends in an empty '#': Moon+ reads it as an empty id, readsync as no fragment";
+                }
+                if (navPoint.labelless()) {
+                    return "a navPoint's label has no text: Moon+ skips it, readsync numbers it";
                 }
                 // Moon+ decodes the whole content/@src (Uri.decode) before splitting off the id.
                 String fragment = navPoint.fragment() == null ? null : EpubPackage.percentDecode(navPoint.fragment());
@@ -270,7 +276,7 @@ public final class MoonChapterAssembly {
             Chapter chapter = list.get(i);
             Chapter next = list.get(i + 1);
             if (chapter.direct != null || chapter.fragment == null || next.fragment != null
-                    || next.spineIndex != chapter.spineIndex || chapter.spineIndex == OUTSIDE_SPINE) {
+                    || !sameFile(list, i, i + 1) || chapter.spineIndex == OUTSIDE_SPINE) {
                 continue;
             }
             FileText file = file(chapter.spineIndex);
@@ -298,7 +304,7 @@ public final class MoonChapterAssembly {
             return false;
         }
         Chapter previous = list.get(i - 1);
-        return !previous.hasSubChapter && previous.spineIndex == chapter.spineIndex
+        return !previous.hasSubChapter && sameFile(list, i - 1, i)
                 && idPosition(file(chapter.spineIndex), chapter.fragment) == -1
                 && chapter.additional.isEmpty() && chapter.lazy == null;
     }

@@ -73,15 +73,17 @@ public final class EpubPackage {
     private final @Nullable List<NavPoint> navPoints;
     private final boolean epub3Nav;
     private final List<String> entryNames;
+    private final @Nullable String ncxEntry;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
-                        boolean epub3Nav, List<String> entryNames) {
+                        boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
         this.navPoints = navPoints;
         this.epub3Nav = epub3Nav;
         this.entryNames = entryNames;
+        this.ncxEntry = ncxEntry;
     }
 
     /**
@@ -97,7 +99,9 @@ public final class EpubPackage {
             List<String> spine = parseSpineHrefs(opf);
             List<NavPoint> navPoints = parseNavPoints(zip, opf, opfDir);
             List<String> names = Collections.list(zip.entries()).stream().map(ZipEntry::getName).toList();
-            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names);
+            String ncx = findNcxHref(opf);
+            String ncxEntry = ncx == null ? null : entryName(zip, resolveRelative(opfDir, ncx));
+            return new EpubPackage(file, opfDir, spine, navPoints, declaresNavDocument(opf), names, ncxEntry);
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -176,6 +180,23 @@ public final class EpubPackage {
      */
     public boolean declaresNavDocument() {
         return epub3Nav;
+    }
+
+    /**
+     * Whether Moon+ would read a different NCX than this package does ({@link #navPoints()} follows the OPF, as
+     * readsync does). Moon+ goes by file name ({@code Epub.getTocFilename}): the zip's only {@code toc.ncx}, else its
+     * only {@code .ncx}; a zip with several and no unique {@code toc.ncx} counts as different (Moon+'s pick then
+     * depends on its sorted file list).
+     */
+    public boolean moonReadsAnotherNcx() {
+        List<String> tocs = entryNames.stream().filter(n -> baseName(n).equals("toc.ncx")).toList();
+        List<String> ncxs = entryNames.stream().filter(n -> n.endsWith(".ncx")).toList();
+        String moon = tocs.size() == 1 ? tocs.getFirst() : tocs.isEmpty() && ncxs.size() == 1 ? ncxs.getFirst() : null;
+        return ncxs.isEmpty() ? ncxEntry != null : moon == null || !moon.equals(ncxEntry);
+    }
+
+    private static String baseName(String path) {
+        return path.substring(path.lastIndexOf('/') + 1);
     }
 
     /** The EPUB file's size in bytes (Moon+ decides some chapter handling by it). */
@@ -329,9 +350,20 @@ public final class EpubPackage {
             String href = hash < 0 ? src : src.substring(0, hash);
             String fragment = hash < 0 || hash == src.length() - 1 ? null : src.substring(hash + 1);
             entries.add(new NavPoint(pythonInt(attribute(navPoint, "playOrder")), href, fragment,
-                    depth(navPoint, navMap), label(navPoint), hash == src.length() - 1));
+                    depth(navPoint, navMap), label(navPoint), hash == src.length() - 1, labelless(navPoint)));
         }
         return entries.isEmpty() ? null : List.copyOf(entries);
+    }
+
+    /** Moon+'s {@code getCName} returning null: a {@code navLabel} without a {@code text} that starts with text. */
+    private static boolean labelless(Element navPoint) {
+        Element navLabel = firstChild(navPoint, NCX_NS, "navLabel");
+        if (navLabel == null) {
+            return false;
+        }
+        Element text = firstChild(navLabel, NCX_NS, "text");
+        Node first = text == null ? null : text.getFirstChild();
+        return first == null || first.getNodeValue() == null;
     }
 
     private static int depth(Element navPoint, Element navMap) {
@@ -408,6 +440,16 @@ public final class EpubPackage {
 
     private static String resolveRelative(String baseDir, String href) {
         return baseDir.isEmpty() ? href : baseDir + "/" + href;
+    }
+
+    /** The name of the entry {@link #readEntry} would read for {@code path}, or null when there is none. */
+    private static @Nullable String entryName(ZipFile zip, String path) {
+        if (zip.getEntry(path) != null) {
+            return path;
+        }
+        String lower = path.toLowerCase(Locale.ROOT);
+        return Collections.list(zip.entries()).stream().map(ZipEntry::getName)
+                .filter(n -> n.toLowerCase(Locale.ROOT).equals(lower)).findFirst().orElse(null);
     }
 
     /** Exact name first, then the first entry (in central-directory order) whose name matches ignoring case. */

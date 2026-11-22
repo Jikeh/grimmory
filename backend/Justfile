@@ -40,7 +40,7 @@ test-moon-position:
     fixtures="${MOON_READSYNC_FIXTURES:-{{ source_directory() }}/../../readsync/tests/fixtures/grimmory}"; \
     if [[ -d "$fixtures" ]]; then args+=(-v "$(abs "$fixtures"):/moon-readsync-fixtures:ro" -e MOON_READSYNC_FIXTURES=/moon-readsync-fixtures); fi; \
     if [[ -n "${MOON_LOCAL_BOOKS:-}" ]]; then args+=(-v "$(abs "$MOON_LOCAL_BOOKS"):/moon-local-books:ro" -e MOON_LOCAL_BOOKS=/moon-local-books); fi; \
-    MSYS_NO_PATHCONV=1 docker compose -f ../dev.docker-compose.yml run --rm --no-deps -T "${args[@]}" backend \
+    MSYS_NO_PATHCONV=1 docker compose -f ../dev.docker-compose.yml run --rm --no-deps -T ${args[@]+"${args[@]}"} backend \
       sh -c 'cd /backend && ./gradlew test --no-daemon --build-cache --tests "org.booklore.service.moonsync.position.*"'
 
 # Run tests and generate JaCoCo coverage output.

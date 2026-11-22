@@ -270,6 +270,25 @@ class MoonChapterAssemblyTest {
     }
 
     @Test
+    void aNavPointWhoseLabelHasNoTextIsUnsupported() {
+        // getCName answers null for <text/>, and getChapter then skips the navPoint, renumbering the rest.
+        String empty = "<navPoint id=\"e\" playOrder=\"2\"><navLabel><text/></navLabel><content src=\"b.xhtml\"/></navPoint>";
+        MoonChapterAssembly assembly = book(np("1", "a.xhtml") + empty + np("3", "c.xhtml"),
+                files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"), "c.xhtml", body("<p>c</p>")));
+        assertThat(assembly.unsupportedReason()).hasValueSatisfying(r -> assertThat(r).contains("label"));
+    }
+
+    @Test
+    void aBookWhereMoonPicksAnotherNcxByNameIsUnsupported() {
+        // The OPF names toc.ncx, but the zip also holds a second toc.ncx: Moon+'s by-name pick is ambiguous.
+        Map<String, String> zip = files("a.xhtml", body("<p>a</p>"), "b.xhtml", body("<p>b</p>"),
+                "old/toc.ncx", TestEpubs.ncx(np("1", "b.xhtml")));
+        MoonChapterAssembly assembly = MoonChapterAssembly.of(EpubPackage.read(TestEpubs.epub(dir,
+                TestEpubs.opf(true, "a.xhtml", "b.xhtml"), TestEpubs.ncx(np("1", "a.xhtml") + np("2", "b.xhtml")), zip)));
+        assertThat(assembly.unsupportedReason()).hasValueSatisfying(r -> assertThat(r).contains("NCX"));
+    }
+
+    @Test
     void anEpub3NavBookIsUnsupported() {
         Path book = TestEpubs.epub(dir, TestEpubs.opf(false, "a.xhtml")
                 .replace("media-type=\"application/xhtml+xml\"/>", "media-type=\"application/xhtml+xml\" properties=\"nav\"/>"),
