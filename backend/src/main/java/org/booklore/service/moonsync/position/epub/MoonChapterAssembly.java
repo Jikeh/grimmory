@@ -51,9 +51,10 @@ import java.util.stream.IntStream;
  * from readsync's: front matter one side counts and the other doesn't, a navPoint whose file isn't in the zip or
  * whose label has no text, a bare {@code #}, fewer than two resolving navPoints, or chapters
  * {@code deleteBrokenChapters} would drop. Chapters whose file is in the zip but not in the spine keep their numbers
- * but have no text here. Also not ported: Moon+ choosing the nav over the NCX when both exist (the two normally
- * agree; when they don't, the book is reported unsupported), finding files by name only, its tours and
- * single-chapter splitting ({@code trySplitChapters}).
+ * but have no text here. When Moon+ takes the EPUB 3 nav over the NCX (a nav at least as long), its labels and
+ * nesting are used; a nav whose entries differ from the NCX's, or that only Moon+ can repair and read, is reported
+ * unsupported. Also not ported: finding files by name only, its tours and single-chapter splitting
+ * ({@code trySplitChapters}).
  */
 public final class MoonChapterAssembly {
 
@@ -218,7 +219,9 @@ public final class MoonChapterAssembly {
         // entries are supported; then the chapters take the nav's labels and nesting.
         List<EpubPackage.NavTocEntry> nav = epub.navTocEntries();
         if (nav.size() >= list.size()) {
-            if (!nav.stream().map(EpubPackage.NavTocEntry::target).toList().equals(list.stream().map(c -> c.tocEntry).toList())) {
+            List<String> navTargets = nav.stream().map(EpubPackage.NavTocEntry::target).toList();
+            List<String> ncxTargets = list.stream().map(c -> c.tocEntry).toList();
+            if (!navTargets.equals(ncxTargets)) {
                 return "Moon+ numbers this book by its EPUB 3 nav, whose entries differ from the NCX's";
             }
             for (int i = 0; i < list.size(); i++) {
@@ -285,6 +288,9 @@ public final class MoonChapterAssembly {
         if (epub.moonReadsAnotherNcx()) {
             return "Moon+ picks its NCX by file name and would read another one than the OPF names";
         }
+        if (epub.navRepairedByMoon()) {
+            return "the EPUB 3 nav has a bare '&': Moon+ repairs and may read it, this port can't tell";
+        }
         if (epub.hasIrregularNcx()) {
             return "the NCX has a shape Moon+ reads differently (a navPoint outside navMap/navPoint, several contents, "
                     + "a content with other attributes but no src, or a %23 in a src)";
@@ -295,7 +301,7 @@ public final class MoonChapterAssembly {
         if (epub.moonNcxNavPoints() > 1) {
             return "Moon+ numbers this book by its NCX, which readsync can't read (no namespace, or not named in the OPF)";
         }
-        if (epub.declaresNavDocument()) {
+        if (epub.hasMoonNavDocument()) {
             return "Moon+ reads this book's chapters from its EPUB 3 nav document (not ported)";
         }
         if (epub.navPoints().map(List::size).orElse(0) == 1 && epub.spineLength() <= 2) {

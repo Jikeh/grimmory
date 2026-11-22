@@ -65,6 +65,8 @@ public final class EpubPackage {
     private static final String NCX_NS = "http://www.daisy.org/z3986/2005/ncx/";
     private static final String NCX_MEDIA_TYPE = "application/x-dtbncx+xml";
     private static final Charset ZIP_NAME_FALLBACK = Charset.forName("IBM437");
+    /** An {@code &} that doesn't start a character or entity reference. */
+    private static final Pattern BARE_AMPERSAND = Pattern.compile("&(?![#A-Za-z0-9]+;)");
     /** A {@code navPoint} start tag, with or without a prefix, in lower-cased text. */
     private static final Pattern NAV_POINT_TAG = Pattern.compile("<(?:[a-z0-9_.-]+:)?navpoint[\\s>/]");
     /** Python's {@code int()}: optional surrounding whitespace and sign, decimal digits, single underscores between. */
@@ -82,11 +84,12 @@ public final class EpubPackage {
     private final int moonNavPoints;
     private final boolean irregularNcx;
     private final List<NavTocEntry> navTocEntries;
+    private final boolean navRepairedByMoon;
 
     private EpubPackage(Path file, String opfDir, List<String> spineHrefs, @Nullable List<NavPoint> navPoints,
                         boolean epub3Nav, List<String> entryNames, @Nullable String ncxEntry,
                         @Nullable String moonNcx, int moonNavPoints, boolean irregularNcx,
-                        List<NavTocEntry> navTocEntries) {
+                        NavRead nav) {
         this.file = file;
         this.opfDir = opfDir;
         this.spineHrefs = spineHrefs;
@@ -97,7 +100,8 @@ public final class EpubPackage {
         this.moonNcx = moonNcx;
         this.moonNavPoints = moonNavPoints;
         this.irregularNcx = irregularNcx;
-        this.navTocEntries = navTocEntries;
+        this.navTocEntries = nav.entries();
+        this.navRepairedByMoon = nav.repairedByMoon();
     }
 
     /**
@@ -122,7 +126,7 @@ public final class EpubPackage {
             int moonNavPoints = moonNcx == null ? 0 : countNavPointTags(zip, moonNcx);
             return new EpubPackage(file, opfDir, spine, navPoints, navEntry != null, names,
                     ncx == null ? null : ncx.getName(), moonNcx, moonNavPoints, read.irregular(),
-                    navEntry == null ? List.of() : navTocEntries(zip, navEntry, names));
+                    navEntry == null ? new NavRead(List.of(), false) : readNavToc(zip, navEntry, names));
         } catch (IOException | SAXException e) {
             throw new EpubContentException("failed to parse EPUB structure of " + file.getFileName() + ": " + e.getMessage(), e);
         }
@@ -200,7 +204,7 @@ public final class EpubPackage {
      * chapter list from it when there is no NCX, or when the nav lists at least as many entries as the NCX
      * ({@code Epub.getChapters}); readsync, and so {@link #navPoints()}, reads the NCX only.
      */
-    public boolean declaresNavDocument() {
+    public boolean hasMoonNavDocument() {
         return epub3Nav;
     }
 
@@ -253,6 +257,19 @@ public final class EpubPackage {
         return navTocEntries;
     }
 
+    /**
+     * Whether the nav document doesn't parse here but Moon+ would read it: {@code Epub.getDocument} parses a file
+     * again with every bare {@code &} escaped when the parser reports an unterminated entity reference. The nav's
+     * entries are then unknown here ({@link #navTocEntries()} is empty).
+     */
+    public boolean navRepairedByMoon() {
+        return navRepairedByMoon;
+    }
+
+    /** A nav's entries, and whether it failed to parse in a way Moon+ repairs. */
+    private record NavRead(List<NavTocEntry> entries, boolean repairedByMoon) {
+    }
+
     /** An NCX or nav target as {@code file#fragment}: the file's base name and the fragment, both percent-decoded. */
     public static String tocEntry(String href, @Nullable String fragment) {
         return target(baseName(percentDecode(href)), fragment == null ? "" : percentDecode(fragment));
@@ -271,6 +288,7 @@ public final class EpubPackage {
             return null;
         }
         String tag = opf.substring(tagStart, tagEnd);
+        // The offsets (+7 to find the closing quote, +6 to start the value) are Moon+'s, quirks included.
         int hrefAt = tag.indexOf("href=\"");
         int hrefEnd = hrefAt < 0 ? -1 : tag.indexOf('"', hrefAt + 7);
         if (hrefEnd < 0) {
@@ -279,20 +297,24 @@ public final class EpubPackage {
         String href = tag.substring(hrefAt + 6, hrefEnd);
         ZipEntry entry = findEntry(zip, resolveRelative(opfDir, href));
         if (entry == null) {
+            // Moon+'s own fallback: any entry whose path ends with the href as written (not by base name).
             entry = names.stream().filter(n -> n.endsWith(href)).findFirst().map(zip::getEntry).orElse(null);
         }
         return entry;
     }
-    private static List<NavTocEntry> navTocEntries(ZipFile zip, ZipEntry entry, List<String> names) throws IOException {
+
+    private static NavRead readNavToc(ZipFile zip, ZipEntry entry, List<String> names) throws IOException {
+        byte[] bytes = read(zip, entry);
         Document nav;
         try {
-            nav = parseXml(read(zip, entry));
+            nav = parseXml(bytes);
         } catch (SAXException e) {
-            return List.of(); // Moon+'s parse fails too, and it keeps the NCX
+            // Moon+'s parse fails too and it keeps the NCX, unless a bare '&' lets it repair the file.
+            return new NavRead(List.of(), BARE_AMPERSAND.matcher(new String(bytes, StandardCharsets.UTF_8)).find());
         }
         NodeList navs = nav.getElementsByTagName("nav");
         if (navs.getLength() == 0) {
-            return List.of();
+            return new NavRead(List.of(), false);
         }
         Element toc = (Element) navs.item(0);
         if (navs.getLength() > 1) {
@@ -313,7 +335,7 @@ public final class EpubPackage {
                 navListItems(ol, 0, names, entries);
             }
         }
-        return List.copyOf(entries);
+        return new NavRead(List.copyOf(entries), false);
     }
 
     private static void navListItems(Node ol, int depth, List<String> zipNames, List<NavTocEntry> entries) {

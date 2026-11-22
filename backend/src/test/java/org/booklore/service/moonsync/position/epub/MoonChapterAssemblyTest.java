@@ -352,6 +352,8 @@ class MoonChapterAssemblyTest {
                 .as("the same entries, nested").isEmpty();
         assertThat(bookWithNav("<li><a href=\"a.xhtml\">A</a></li>").unsupportedReason())
                 .as("a shorter nav: Moon+ keeps the NCX").isEmpty();
+        assertThat(bookWithNav("<li><a href=\"a.xhtml\">Pride & Prejudice</a></li><li><a href=\"b.xhtml\">B</a></li>")
+                .unsupportedReason()).as("a bare & Moon+ repairs (getDocument)").hasValueSatisfying(r -> assertThat(r).contains("&"));
     }
 
     @Test

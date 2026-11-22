@@ -237,12 +237,12 @@ class EpubPackageTest {
         Map<String, String> nav = Map.of("nav.xhtml", "<html><body><nav><ol/></nav></body></html>");
         String opf = TestEpubs.opf(false, "nav.xhtml");
         assertThat(EpubPackage.read(TestEpubs.epub(dir, opf.replace("xml\"/>", "xml\" properties=\"nav\"/>"), null, nav))
-                .declaresNavDocument()).isTrue();
+                .hasMoonNavDocument()).isTrue();
         assertThat(EpubPackage.read(TestEpubs.epub(dir, opf.replace("xml\"/>", "xml\" properties=\"scripted nav\"/>"), null, nav))
-                .declaresNavDocument()).as("not the literal text").isFalse();
+                .hasMoonNavDocument()).as("not the literal text").isFalse();
         assertThat(EpubPackage.read(TestEpubs.epub(dir, opf.replace("xml\"/>", "xml\" properties=\"nav\"/>"), null, Map.of()))
-                .declaresNavDocument()).as("no such file").isFalse();
-        assertThat(EpubPackage.read(plainBook()).declaresNavDocument()).isFalse();
+                .hasMoonNavDocument()).as("no such file").isFalse();
+        assertThat(EpubPackage.read(plainBook()).hasMoonNavDocument()).isFalse();
     }
 
     // --- Real fixtures (readsync's, not committed here) ---
